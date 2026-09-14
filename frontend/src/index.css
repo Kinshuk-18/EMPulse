@@ -1,12 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-  body {
-    background-color: #F8F9FA; /* Soft off-white for the main dashboard background */
-    color: #1E293B; /* Dark slate for readable text */
-    margin: 0;
-    font-family: 'Inter', system-ui, sans-serif;
-  }
+@theme {
+    --color-brand: #6c5ce7;
 }

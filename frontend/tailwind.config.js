@@ -6,9 +6,7 @@ export default {
   ],
   theme: {
     extend: {
-      colors: {
-        brand: "#6C5CE7", 
-      }
+      colors: { brand: "#6C5CE7" }
     },
   },
   plugins: [],
