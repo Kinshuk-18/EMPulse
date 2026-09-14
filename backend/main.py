@@ -24,7 +24,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-# ── Internal modules ──────────────────────────────────────────────────────────
+# Internal modules ──────────────────────────────────────────────────────────
 # database.py  → engine (DB connection), get_db (session factory), Base (ORM parent)
 # models.py    → Trainee + OutcomeLog ORM classes (map to MySQL tables)
 # schemas.py   → Pydantic validation schemas for request/response bodies
@@ -32,10 +32,7 @@ from database import engine, get_db, Base
 import models
 import schemas
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # Lifespan — startup & shutdown logic (modern FastAPI pattern, replaces @app.on_event)
-# ════════════════════════════════════════════════════════════════════════════
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,10 +52,7 @@ async def lifespan(app: FastAPI):
     yield   # ← the server is live and processing requests here
     print("🛑 EMPulse API shutting down …")
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # FastAPI Application Instance
-# ════════════════════════════════════════════════════════════════════════════
 
 app = FastAPI(
     title="EMPulse API",
@@ -71,10 +65,7 @@ app = FastAPI(
     lifespan=lifespan,  # wire up our startup/shutdown logic
 )
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # CORS Middleware
-# ════════════════════════════════════════════════════════════════════════════
 # CORS (Cross-Origin Resource Sharing) is a browser security mechanism that
 # blocks a web page from making requests to a different domain than the one
 # that served the page.
@@ -83,9 +74,9 @@ app = FastAPI(
 #          FastAPI runs on           http://localhost:8000
 # Without CORS headers, the browser will refuse the API call.
 #
-# ⚠️  allow_origins=["*"] is fine for development/hackathons.
-#     In production, restrict to: allow_origins=["https://empulse.vercel.app"]
-# ════════════════════════════════════════════════════════════════════════════
+# allow_origins=["*"] is fine for development/hackathons.
+# In production, restrict to: allow_origins=["https://empulse.vercel.app"]
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -95,11 +86,8 @@ app.add_middleware(
     allow_headers=["*"],      # accept any custom request headers
 )
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # ROUTE 1 — Health Check
 # GET /
-# ════════════════════════════════════════════════════════════════════════════
 
 @app.get("/", tags=["Health"])
 def health_check():
@@ -109,11 +97,8 @@ def health_check():
     """
     return {"status": "EMPulse API is running ✅"}
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # ROUTE 2 — Register a New Trainee
 # POST /api/trainees
-# ════════════════════════════════════════════════════════════════════════════
 
 @app.post(
     "/api/trainees",
@@ -182,11 +167,8 @@ def create_trainee(
             detail="Failed to create trainee. Please try again.",
         )
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # ROUTE 3 — List All Trainees
 # GET /api/trainees
-# ════════════════════════════════════════════════════════════════════════════
 
 @app.get(
     "/api/trainees",
@@ -224,11 +206,8 @@ def get_all_trainees(db: Session = Depends(get_db)):
             detail="Failed to fetch trainees from the database.",
         )
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # ROUTE 4 — Log a Check-in Outcome (ATOMIC DUAL-WRITE)
 # POST /api/outcomes
-# ════════════════════════════════════════════════════════════════════════════
 
 @app.post(
     "/api/outcomes",
@@ -280,7 +259,7 @@ def log_outcome(
         HTTPException 404: If no trainee with the given  trainee_id  exists.
         HTTPException 500: For any unexpected database error.
     """
-    # ── Step 1: Verify the trainee exists ────────────────────────────────────
+    # Step 1: Verify the trainee exists ────────────────────────────────────
     # SELECT * FROM trainees WHERE id = :trainee_id LIMIT 1
     trainee = db.query(models.Trainee).filter(
         models.Trainee.id == outcome_data.trainee_id
@@ -294,7 +273,7 @@ def log_outcome(
         )
 
     try:
-        # ── Step 2: Build the OutcomeLog ORM object ───────────────────────────
+        # Step 2: Build the OutcomeLog ORM object ───────────────────────────
         # We must NOT pass  new_status  here — it's a Pydantic-only field used
         # to drive the status update below; it does NOT exist in the DB table.
         new_log = models.OutcomeLog(
@@ -304,20 +283,20 @@ def log_outcome(
             # logged_at is auto-filled by the DB column default (datetime.utcnow)
         )
 
-        # ── Step 3: Update the trainee's current status ───────────────────────
+        # Step 3: Update the trainee's current status ───────────────────────
         # SQLAlchemy tracks changes to objects loaded in this session.
         # Changing an attribute here will generate an UPDATE statement on commit.
         # We cast to the enum so MySQL's ENUM column type accepts it cleanly.
         trainee.current_status = models.TraineeStatus(outcome_data.new_status)
 
-        # ── Step 4: Stage + commit BOTH writes in a single transaction ─────────
+        # Step 4: Stage + commit BOTH writes in a single transaction ─────────
         db.add(new_log)   # stage: INSERT INTO outcome_logs (…) VALUES (…)
                           # trainee.current_status change is already tracked by SQLAlchemy
 
         db.commit()       # ATOMIC COMMIT: INSERT + UPDATE happen together
                           # If MySQL throws an error, neither write is persisted.
 
-        # ── Step 5: Reload to get auto-generated values (id, logged_at) ───────
+        # Step 5: Reload to get auto-generated values (id, logged_at) ───────
         db.refresh(new_log)
 
         return new_log    # Pydantic + schemas.OutcomeLogResponse serialise this

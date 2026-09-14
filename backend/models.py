@@ -35,12 +35,10 @@ from sqlalchemy.orm import relationship
 
 from database import Base   # the declarative Base we created in database.py
 
-
-# ════════════════════════════════════════════════════════════════════════════
 # Python Enum — defines the allowed values for Trainee.current_status
 # Using Python's enum.Enum keeps the allowed values in one place and gives
 # us IDE auto-complete and runtime validation for free.
-# ════════════════════════════════════════════════════════════════════════════
+
 class TraineeStatus(str, enum.Enum):
     """
     Employment status of a trainee at the time of a check-in.
