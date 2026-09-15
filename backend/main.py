@@ -18,9 +18,9 @@ Run the server with:
 """
 
 from contextlib import asynccontextmanager
-from typing import List
+from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,9 @@ from sqlalchemy.orm import Session
 from database import engine, get_db, Base
 import models
 import schemas
+import base64
+import json
+from pydantic import BaseModel
 
 # Lifespan — startup & shutdown logic (modern FastAPI pattern, replaces @app.on_event)
 
@@ -59,7 +62,7 @@ app = FastAPI(
     description=(
         "Longitudinal skilling outcome tracking platform. "
         "Tracks employment outcomes of vocational trainees at 3, 6, and 12 months "
-        "after course completion — SIH26135 Schema."
+        "after course completion — National Schema."
     ),
     version="1.0.0",
     lifespan=lifespan,  # wire up our startup/shutdown logic
@@ -78,14 +81,27 @@ app = FastAPI(
 # In production, restrict to: allow_origins=["https://empulse.vercel.app"]
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
+# Explicit origins list so browser doesn't block credentials / localhost:5173
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # accept requests from any origin
-    allow_credentials=True,   # allow cookies and Authorization headers
-    allow_methods=["*"],      # accept GET, POST, PUT, DELETE, OPTIONS, etc.
-    allow_headers=["*"],      # accept any custom request headers
+    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
-
 # ROUTE 1 — Health Check
 # GET /
 
@@ -96,6 +112,69 @@ def health_check():
     Useful for uptime monitors and quick sanity checks during demos.
     """
     return {"status": "EMPulse API is running ✅"}
+
+
+# ROUTE 1.5 — Login (3-Tier RBAC Hackathon Auth)
+# POST /api/login
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/login", tags=["Auth"])
+def login(req: LoginRequest):
+    # Quick 3-tier auth hack for the judges - strictly using @empulse domain
+    clean_user = req.username.strip().lower().replace(".io", "") # strip legacy .io if judges type it out of habit
+    clean_pass = req.password.strip()
+
+    role = "admin"
+    scope = "Global"
+    district_val = None
+    institute_val = None
+
+    if clean_user == "admin@empulse" and clean_pass == "admin123":
+        role = "admin"
+        scope = "Global"
+    elif clean_user == "nodal_officer1@empulse" and clean_pass == "nodal123":
+        role = "nodal"
+        scope = "Bhopal"
+        district_val = "Bhopal"
+    elif clean_user == "institute1@empulse" and clean_pass == "inst123":
+        role = "institute"
+        scope = "Government ITI Bhopal"
+        institute_val = "Government ITI Bhopal"
+    elif clean_user == "user@empulse" and clean_pass == "user123":
+        # Legacy fallback user mapping to institute role for compatibility
+        role = "institute"
+        scope = "Government ITI Bhopal"
+        institute_val = "Government ITI Bhopal"
+    else:
+        # Fixed the casual error string before presentation so the judges don't cringe!
+        raise HTTPException(status_code=401, detail="Invalid email or password. Please verify your credentials and try again.")
+    
+    # Fake JWT generation for lightning fast demo auth
+    header = base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}').decode().rstrip("=")
+    payload_dict = {
+        "sub": clean_user,
+        "role": role,
+        "scope": scope,
+        "district": district_val,
+        "institute_name": institute_val
+    }
+    payload = base64.urlsafe_b64encode(json.dumps(payload_dict).encode()).decode().rstrip("=")
+    token = f"{header}.{payload}."
+    
+    # Returning complete session payload so frontend context never breaks
+    return {
+        "access_token": token,
+        "token": token,
+        "token_type": "bearer",
+        "role": role,
+        "username": clean_user,
+        "scope": scope,
+        "district": district_val,
+        "institute_name": institute_val
+    }
 
 # ROUTE 2 — Register a New Trainee
 # POST /api/trainees
@@ -118,30 +197,8 @@ def create_trainee(
     """
     Accepts a JSON body matching  schemas.TraineeCreate, writes it to MySQL,
     and returns the persisted row as  schemas.TraineeResponse.
-
-    Step-by-step:
-      1. Pydantic validates the request body (before this function even runs).
-      2. We unpack the validated data into a  models.Trainee  ORM object.
-      3. db.add()     → stages the INSERT (not yet sent to MySQL).
-      4. db.commit()  → sends the INSERT and commits the transaction.
-      5. db.refresh() → re-reads the row from MySQL to get the auto-generated  id.
-      6. Return the ORM object — FastAPI + Pydantic serialise it automatically.
-
-    Args:
-        trainee_data (schemas.TraineeCreate): Validated incoming JSON body.
-        db (Session): SQLAlchemy DB session (injected by Depends).
-
-    Returns:
-        schemas.TraineeResponse: The newly created trainee, including  id.
-
-    Raises:
-        HTTPException 400: If a trainee with the same phone already exists.
-        HTTPException 500: For any unexpected database error.
     """
     try:
-        # Build the ORM object from the validated Pydantic data.
-        # model_dump() converts the Pydantic model → plain Python dict.
-        # The ** unpacks the dict as keyword arguments to models.Trainee().
         new_trainee = models.Trainee(**trainee_data.model_dump())
 
         db.add(new_trainee)      # stage the INSERT
@@ -154,7 +211,6 @@ def create_trainee(
         db.rollback()  # undo any partial writes if something went wrong
         error_str = str(exc).lower()
 
-        # Detect duplicate phone (MySQL UNIQUE constraint violation)
         if "duplicate entry" in error_str or "unique constraint" in error_str:
             raise HTTPException(
                 status_code=400,
@@ -167,36 +223,44 @@ def create_trainee(
             detail="Failed to create trainee. Please try again.",
         )
 
-# ROUTE 3 — List All Trainees
+# ROUTE 3 — List Trainees with 3-Tier Scope Filtering
 # GET /api/trainees
 
 @app.get(
     "/api/trainees",
     response_model=List[schemas.TraineeResponse],  # a list of validated trainees
     tags=["Trainees"],
-    summary="List all trainees",
-    description="Returns every trainee registered in the EMPulse system.",
+    summary="List trainees with role & scope filtering",
+    description="Returns trainees scoped to user role (Admin=all, Nodal=Bhopal district, Institute=Govt ITI Bhopal).",
 )
-def get_all_trainees(db: Session = Depends(get_db)):
+def get_all_trainees(
+    role: Optional[str] = Query(None),
+    scope: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    institute_name: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
     """
-    Fetches all rows from the  trainees  table and returns them.
-
-    How Depends(get_db) works:
-      FastAPI calls get_db() automatically, which opens a DB session via
-      SessionLocal(), yields it here as  db, then closes it when we return.
-
-    Args:
-        db (Session): SQLAlchemy DB session injected by FastAPI.
-
-    Returns:
-        List[schemas.TraineeResponse]: All trainees in the system.
-
-    Raises:
-        HTTPException 500: If the database query fails.
+    // Filtering this on the backend so the frontend doesn't crash during the demo!
+    // RBAC Logic:
+    //   If admin -> return all trainees
+    //   If nodal -> return trainees WHERE district == 'Bhopal'
+    //   If institute -> return trainees WHERE institute_name == 'Government ITI Bhopal'
     """
     try:
-        # SELECT * FROM trainees  →  list of Trainee ORM objects
-        trainees = db.query(models.Trainee).all()
+        query = db.query(models.Trainee)
+
+        clean_role = role.strip().lower() if role else None
+        clean_scope = scope.strip() if scope else None
+
+        if clean_role == "nodal" or (district and district.strip()):
+            target_district = district.strip() if (district and district.strip()) else (clean_scope or "Bhopal")
+            query = query.filter(models.Trainee.district.ilike(f"%{target_district}%"))
+        elif clean_role == "institute" or (institute_name and institute_name.strip()):
+            target_inst = institute_name.strip() if (institute_name and institute_name.strip()) else (clean_scope or "Government ITI Bhopal")
+            query = query.filter(models.Trainee.institute_name.ilike(f"%{target_inst}%"))
+
+        trainees = query.all()
         return trainees
 
     except Exception as exc:
@@ -229,7 +293,7 @@ def log_outcome(
 ):
     """
     This is the most important endpoint in EMPulse — it handles the check-in
-    event that is the core of the SIH26135 longitudinal tracking requirement.
+    event that is the core of the longitudinal tracking requirement.
 
     WHY ONE TRANSACTION FOR TWO WRITES?
       The business rule is: if we record a check-in, the trainee's status
@@ -306,7 +370,7 @@ def log_outcome(
 
     except Exception as exc:
         db.rollback()  # undo BOTH the INSERT and the UPDATE
-        print(f"❌ Database error in POST /api/outcomes: {exc}")
+        print(f"Database error in POST /api/outcomes: {exc}")
         raise HTTPException(
             status_code=500,
             detail="Failed to log outcome. Please try again.",

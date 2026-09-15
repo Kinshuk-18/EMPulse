@@ -1,7 +1,7 @@
 """
 models.py — EMPulse Backend
 =============================
-Defines the two core database tables for the SIH26135 schema:
+Defines the two core database tables for the schema:
 
   ┌──────────────┐        ┌─────────────────┐
   │   Trainee    │ 1────* │   OutcomeLog    │
@@ -157,7 +157,7 @@ class OutcomeLog(Base):
     """
     Records a single longitudinal check-in event for a trainee.
 
-    The SIH26135 scheme mandates three check-ins per trainee:
+    The national scheme mandates three check-ins per trainee:
       • 3-month  check-in
       • 6-month  check-in
       • 12-month check-in

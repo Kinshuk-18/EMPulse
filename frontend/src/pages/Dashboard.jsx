@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
 import {
   Users,
   Briefcase,
@@ -6,11 +7,15 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
+  MapPin,
+  Building2,
+  ShieldCheck,
+  Award
 } from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:8000";
 
-// Reusable card — same design as before, just driven by live data now
+// Reusable Metric Card component
 function MetricCard({ metric }) {
   const Icon = metric.icon;
   const isUp = metric.trend === "up";
@@ -48,41 +53,56 @@ function MetricCard({ metric }) {
   );
 }
 
-// Spinner for the loading state — keeping it dead simple
+// Simple loading spinner
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-16">
       <RefreshCw
         size={28}
-        className="animate-spin"
-        style={{ color: "#6C5CE7" }}
+        className="animate-spin text-[#6c5ce7]"
       />
-      <span className="ml-3 text-sm text-gray-400">Loading from backend…</span>
+      <span className="ml-3 text-sm text-gray-400 font-medium">Fetching scoped data from backend...</span>
     </div>
   );
 }
 
 export default function Dashboard() {
-  // All three metrics live here — null means "not loaded yet"
-  const [trainees, setTrainees]   = useState(null);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
+  const { role, scope, district, instituteName } = useContext(AuthContext);
+
+  const [trainees, setTrainees] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
+  // Hackathon dev comment: Filtering metrics dynamically based on RBAC scope returned by backend!
   const fetchTrainees = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Grabbing the trainee data from the backend — hope CORS doesn't block this
-      const res = await fetch(`${API_BASE}/api/trainees`);
+      // Build query string based on role and scope
+      const params = new URLSearchParams();
+      if (role) params.append("role", role);
+      if (scope) params.append("scope", scope);
+      if (district) params.append("district", district);
+      if (instituteName) params.append("institute_name", instituteName);
+
+      const url = `${API_BASE}/api/trainees?${params.toString()}`;
+      
+      let res;
+      try {
+        res = await fetch(url);
+      } catch (err) {
+        // Fallback to localhost if 127.0.0.1 binding is stubborn
+        res = await fetch(`http://localhost:8000/api/trainees?${params.toString()}`);
+      }
+
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = await res.json();
       setTrainees(data);
       setLastUpdated(new Date());
     } catch (err) {
-      // Backend probably isn't running — show a red banner instead of a broken UI
-      setError("Could not reach the backend. Is uvicorn running on port 8000?");
-      console.error("Dashboard fetch failed:", err);
+      setError("Could not reach backend API at http://127.0.0.1:8000. Is uvicorn main:app --reload running?");
+      console.error("Dashboard fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -90,18 +110,34 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchTrainees();
-    // TODO: add auto-refresh every 60s here if judges ask for "live updates"
-  }, []);
+  }, [role, scope, district, instituteName]);
 
-  // Quick hack to calculate placement rate before the demo
-  // "Employed" AND "Self-Employed" both count as placed for SIH26135 scoring
-  const total    = trainees?.length ?? 0;
+  // Hackathon dev comment: Dynamic title greeting depending strictly on user's role!
+  let titleGreeting = "National Skilling Overview";
+  let scopeBadge = "Global Scope";
+  let ScopeIcon = ShieldCheck;
+
+  if (role === "nodal") {
+    titleGreeting = "Bhopal Region Dashboard";
+    scopeBadge = "District: Bhopal";
+    ScopeIcon = MapPin;
+  } else if (role === "institute") {
+    titleGreeting = "Govt ITI Bhopal Center";
+    scopeBadge = "Institute: Government ITI Bhopal";
+    ScopeIcon = Building2;
+  } else if (role === "admin") {
+    titleGreeting = "National Skilling Overview";
+    scopeBadge = "National Scope (Global)";
+    ScopeIcon = ShieldCheck;
+  }
+
+  // Calculate metrics dynamically ONLY from filtered trainee list returned by backend
+  const total = trainees?.length ?? 0;
   const employed = trainees?.filter(
     (t) => t.current_status === "Employed" || t.current_status === "Self-Employed"
   ).length ?? 0;
   const rate = total > 0 ? ((employed / total) * 100).toFixed(1) : "0.0";
 
-  // Build the metrics array from live numbers so MetricCard doesn't change
   const metrics = [
     {
       id: "total-trainees",
@@ -109,7 +145,7 @@ export default function Dashboard() {
       value: loading ? "—" : total.toLocaleString(),
       change: "+live",
       trend: "up",
-      description: "from database",
+      description: role === "admin" ? "in national database" : `scoped to ${scope || 'role'}`,
       icon: Users,
       iconBg: "#EEF2FF",
       iconColor: "#6C5CE7",
@@ -129,10 +165,9 @@ export default function Dashboard() {
       id: "placement-rate",
       label: "Placement Rate",
       value: loading ? "—" : `${rate}%`,
-      // Highlight red if rate drops below 50% — useful signal for the judges
       change: parseFloat(rate) >= 50 ? "On target" : "Below target",
       trend: parseFloat(rate) >= 50 ? "up" : "down",
-      description: "of all registered trainees",
+      description: "of scoped candidates",
       icon: TrendingUp,
       iconBg: "#FFF7ED",
       iconColor: "#F97316",
@@ -146,46 +181,48 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-xs font-semibold text-[#6c5ce7] mb-2 border border-indigo-100">
+            <ScopeIcon size={14} />
+            <span>{scopeBadge}</span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-            Welcome back,{" "}
-            <span style={{ color: "#6C5CE7" }}>Admin</span> 👋
+            {titleGreeting}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Here's what's happening with your trainees today.
+            Real-time longitudinal outcome tracking.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Manual refresh — judges love clicking this to show "live data" */}
           <button
             onClick={fetchTrainees}
             disabled={loading}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-all cursor-pointer shadow-sm"
           >
-            <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            Refresh
+            <RefreshCw size={14} className={loading ? "animate-spin text-[#6c5ce7]" : ""} />
+            <span>Refresh Data</span>
           </button>
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            {formattedTime ? `Updated: ${formattedTime}` : "Fetching…"}
+          <div className="flex items-center gap-2 text-xs text-gray-400 font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            {formattedTime ? `Updated ${formattedTime}` : "Connecting..."}
           </div>
         </div>
       </div>
 
-      {/* Red error banner — shows when uvicorn isn't running */}
+      {/* Backend error banner */}
       {error && (
-        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 shadow-sm">
           <span className="text-lg leading-none">⚠️</span>
           <div>
-            <p className="font-semibold">Backend unreachable</p>
-            <p className="mt-0.5 text-red-500">{error}</p>
+            <p className="font-bold">Backend Unreachable</p>
+            <p className="mt-0.5 text-xs text-red-600">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Metric Cards — show spinner while waiting, cards once data arrives */}
+      {/* Dynamic Key Metric Cards */}
       <section>
         <h2 className="sr-only">Key Metrics</h2>
         {loading ? (
@@ -199,33 +236,70 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Recent Activity placeholder — TODO: populate with real log data */}
+      {/* Scoped Trainee Preview Table / Summary */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-800">
-            Recent Activity
-          </h2>
-          <button
-            className="text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-            style={{ color: "#6C5CE7" }}
-          >
-            View all
-          </button>
-        </div>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-            style={{ backgroundColor: "#EEF2FF" }}
-          >
-            <Users size={28} style={{ color: "#6C5CE7" }} />
+          <div>
+            <h2 className="text-base font-bold text-gray-800">
+              Scoped Trainee Records ({total})
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Showing candidates filtered by role access: <span className="font-semibold text-gray-700">{scope || 'Global'}</span>
+            </p>
           </div>
-          <p className="text-sm font-medium text-gray-600">No activity yet</p>
-          <p className="text-xs text-gray-400 mt-1">
-            Outcome check-in events will appear here once trainees are logged.
-          </p>
+          <a
+            href="/trainees"
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors text-[#6c5ce7]"
+          >
+            View Full Database →
+          </a>
         </div>
+
+        {loading ? (
+          <div className="py-8 text-center text-xs text-gray-400">Loading scoped records...</div>
+        ) : total === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 bg-indigo-50 text-[#6c5ce7]">
+              <Users size={24} />
+            </div>
+            <p className="text-sm font-semibold text-gray-700">No trainees found for this scope</p>
+            <p className="text-xs text-gray-400 mt-1">Register new candidates to view longitudinal outcomes.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold uppercase tracking-wider">
+                  <th className="py-3 px-4">Name</th>
+                  <th className="py-3 px-4">Institute</th>
+                  <th className="py-3 px-4">Course</th>
+                  <th className="py-3 px-4">District</th>
+                  <th className="py-3 px-4 text-center">Current Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {trainees.slice(0, 5).map((t) => (
+                  <tr key={t.id} className="hover:bg-gray-50/80 transition-colors">
+                    <td className="py-3 px-4 font-semibold text-gray-900">{t.name}</td>
+                    <td className="py-3 px-4 text-gray-600">{t.institute_name}</td>
+                    <td className="py-3 px-4 text-gray-600">{t.course_name}</td>
+                    <td className="py-3 px-4 text-gray-600">{t.district}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                        t.current_status === 'Employed' || t.current_status === 'Self-Employed'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {t.current_status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );
 }
-

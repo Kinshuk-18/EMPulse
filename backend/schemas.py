@@ -272,7 +272,7 @@ class OutcomeLogCreate(BaseModel):
     @classmethod
     def must_be_valid_month(cls, value: int) -> int:
         """
-        The SIH26135 scheme defines exactly three check-in points.
+        The national scheme defines exactly three check-in points.
         Reject any other value before it reaches the database.
         """
         allowed_months = {3, 6, 12}
