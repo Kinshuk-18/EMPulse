@@ -13,11 +13,10 @@ function StatusBadge({ status }) {
   const isGood = status === 'Employed' || status === 'Self-Employed';
   return (
     <span
-      className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-        isGood
-          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-          : 'bg-amber-50 text-amber-700 border border-amber-200'
-      }`}
+      className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${isGood
+        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+        : 'bg-amber-50 text-amber-700 border border-amber-200'
+        }`}
     >
       {status}
     </span>
@@ -131,21 +130,21 @@ function TrackingTimeline({ trainee }) {
         source === 'WhatsApp Bot'
           ? `Status self-reported as "${trainee.current_status}" via WhatsApp conversational flow`
           : source === 'Manual'
-          ? `Nodal officer manually recorded status as "${trainee.current_status}" after field visit`
-          : `Status automatically confirmed as "${trainee.current_status}" via ${source} ping`,
+            ? `Nodal officer manually recorded status as "${trainee.current_status}" after field visit`
+            : `Status automatically confirmed as "${trainee.current_status}" via ${source} ping`,
       icon: source === 'WhatsApp Bot' ? Wifi : source === 'Manual' ? AlertCircle : CheckCircle2,
       color:
         source === 'Manual'
           ? 'text-gray-400'
           : source === 'WhatsApp Bot'
-          ? 'text-blue-500'
-          : 'text-emerald-500',
+            ? 'text-blue-500'
+            : 'text-emerald-500',
       bg:
         source === 'Manual'
           ? 'bg-gray-50'
           : source === 'WhatsApp Bot'
-          ? 'bg-blue-50'
-          : 'bg-emerald-50',
+            ? 'bg-blue-50'
+            : 'bg-emerald-50',
     },
     {
       date: fmt(plusMonths(baseDate, 6)),
@@ -264,13 +263,7 @@ export default function Trainees() {
       if (district) params.append('district', district);
       if (instituteName) params.append('institute_name', instituteName);
 
-      let res;
-      try {
-        res = await fetch(`http://127.0.0.1:8000/api/trainees?${params.toString()}`);
-      } catch {
-        // Fallback to localhost if 127.0.0.1 binding is stubborn on some machines
-        res = await fetch(`http://localhost:8000/api/trainees?${params.toString()}`);
-      }
+      const res = await fetch(`https://empulse-z3uq.onrender.com/api/trainees?${params.toString()}`);
 
       if (!res.ok) throw new Error('Failed to fetch trainees from backend');
       const data = await res.json();
@@ -296,20 +289,11 @@ export default function Trainees() {
         graduation_date: new Date(formData.graduation_date).toISOString(),
       };
 
-      let res;
-      try {
-        res = await fetch('http://127.0.0.1:8000/api/trainees', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } catch {
-        res = await fetch('http://localhost:8000/api/trainees', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      }
+      const res = await fetch('https://empulse-z3uq.onrender.com/api/trainees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -346,21 +330,9 @@ export default function Trainees() {
 
     setDeletingId(traineeId);
     try {
-      let res;
-      try {
-        res = await fetch(`http://127.0.0.1:8000/api/trainees/${traineeId}`, {
-          method: 'DELETE',
-        });
-      } catch {
-        res = await fetch(`http://localhost:8000/api/trainees/${traineeId}`, {
-          method: 'DELETE',
-        });
-      }
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.detail || 'Delete failed');
-      }
+      const res = await fetch(`https://empulse-z3uq.onrender.com/api/trainees/${traineeId}`, {
+        method: 'DELETE',
+      });
 
       // Optimistic UI: remove from state, close modal
       setTrainees((prev) => prev.filter((t) => t.id !== traineeId));
@@ -598,10 +570,10 @@ export default function Trainees() {
                 value={
                   selectedTrainee.graduation_date
                     ? new Date(selectedTrainee.graduation_date).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      })
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                    })
                     : '—'
                 }
               />

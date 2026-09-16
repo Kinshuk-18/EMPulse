@@ -27,7 +27,7 @@ export default function Home() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -45,21 +45,11 @@ export default function Home() {
 
     // Quick 3-tier auth request to FastAPI backend
     try {
-      let res;
-      try {
-        res = await fetch('http://127.0.0.1:8000/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username.trim(), password: password.trim() }),
-        });
-      } catch (networkErr) {
-        // Fallback to localhost if 127.0.0.1 host binding gets quirky
-        res = await fetch('http://localhost:8000/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username.trim(), password: password.trim() }),
-        });
-      }
+      const res = await fetch('https://empulse-z3uq.onrender.com/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
+      });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -68,7 +58,7 @@ export default function Home() {
       }
 
       const data = await res.json();
-      
+
       // Store user, role, scope, and token in AuthContext
       login(data);
 
@@ -76,7 +66,7 @@ export default function Home() {
       navigate('/dashboard');
     } catch (err) {
       if (err.message && err.message.includes('Failed to fetch')) {
-        setError('Backend server unreachable at http://127.0.0.1:8000. Please start uvicorn main:app --reload.');
+        setError('Backend server unreachable. The live database might be waking up, please wait 30 seconds and try again.');
       } else {
         // Fixed the casual error string before presentation
         setError(err.message || 'Invalid email or password. Please verify your credentials and try again.');
@@ -112,11 +102,11 @@ export default function Home() {
 
       {/* Main Container: Split 60% / 40% */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col lg:flex-row gap-8 items-stretch">
-        
+
         {/* Left Side: Official Scheme Details & Milestones (60% Width) */}
         <section className="w-full lg:w-[60%] flex flex-col justify-between space-y-6 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
           <div className="space-y-6">
-            
+
             {/* National Emblem / Badge & Scheme Banner */}
             <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
               <div className="w-14 h-14 rounded-xl bg-gradient-to-tr from-[#6c5ce7] to-indigo-600 flex items-center justify-center shadow-lg shadow-[#6c5ce7]/20 flex-shrink-0 text-white">
@@ -204,7 +194,7 @@ export default function Home() {
         {/* Right Side: Fixed Clean Login Panel (40% Width) */}
         <section className="w-full lg:w-[40%] bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="space-y-6">
-            
+
             {/* Panel Title */}
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-[#6c5ce7] mb-2">
