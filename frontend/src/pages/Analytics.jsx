@@ -25,7 +25,7 @@ import { BASE_URL } from '../config';
 
 // ── Reusable horizontal bar chart row ─────────────────────────────────────────
 function BarRow({ label, value, max, color, suffix = '', pctLabel }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  const pct = max > 0 ? Math.round(Math.min(Math.max((value / max) * 100, 0), 100)) : 0;
   const display = pctLabel ?? `${pct}%`;
   return (
     <div className="space-y-1.5">
@@ -368,14 +368,14 @@ export default function Analytics() {
                       <div
                         className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
                         style={{
-                          width: `${Math.round((c.total / maxCourseTotal) * 100)}%`,
+                          width: `${Math.round(Math.min(Math.max((c.total / maxCourseTotal) * 100, 0), 100))}%`,
                           backgroundColor: '#e5e7eb',
                         }}
                       />
                       <div
                         className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
                         style={{
-                          width: `${Math.round((c.employed / maxCourseTotal) * 100)}%`,
+                          width: `${Math.round(Math.min(Math.max((c.employed / maxCourseTotal) * 100, 0), 100))}%`,
                           backgroundColor: c.rate >= 60 ? '#22c55e' : c.rate >= 35 ? '#f59e0b' : '#ef4444',
                         }}
                       />
@@ -491,7 +491,7 @@ export default function Analytics() {
                           <div
                             className="h-full rounded-full transition-all duration-700"
                             style={{
-                              width: total > 0 ? `${Math.round((m.value / total) * 100)}%` : '0%',
+                              width: total > 0 ? `${Math.round(Math.min(Math.max((m.value / total) * 100, 0), 100))}%` : '0%',
                               backgroundColor: funnelColors[idx],
                             }}
                           />
@@ -559,7 +559,7 @@ export default function Analytics() {
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{
-                            width: `${Math.round((s.total / maxSectorTotal) * 100)}%`,
+                            width: `${Math.round(Math.min(Math.max((s.total / maxSectorTotal) * 100, 0), 100))}%`,
                             backgroundColor: s.color,
                           }}
                         />
@@ -706,7 +706,7 @@ export default function Analytics() {
                           <div
                             className="h-full rounded-full transition-all duration-700"
                             style={{
-                              width: `${Math.round((e.total / maxT) * 100)}%`,
+                              width: `${Math.round(Math.min(Math.max((e.total / maxT) * 100, 0), 100))}%`,
                               backgroundColor: instColors[i % instColors.length],
                             }}
                           />

@@ -38,7 +38,6 @@ function getNavLinks(role) {
       { to: "/dashboard", label: "Dashboard",      icon: LayoutDashboard, end: true },
       { to: "/trainees",  label: "Trainees",       icon: Users },
       { to: "/analytics", label: "Analytics",      icon: BarChart3 },
-      { to: "/remedial-actions",label: "Remedial Center",icon: Activity },
       { to: "/contact",   label: "Help & Support", icon: Headphones },
       { to: "/settings",  label: "Settings",       icon: Settings },
     ];

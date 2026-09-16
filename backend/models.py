@@ -282,3 +282,23 @@ class OutcomeLog(Base):
             f"<OutcomeLog id={self.id} trainee_id={self.trainee_id} "
             f"month={self.checkin_month} via='{self.verification_source}'>"
         )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Model 3: Institute
+# Maps to the MySQL table  `institutes`
+# ════════════════════════════════════════════════════════════════════════════
+class Institute(Base):
+    __tablename__ = "institutes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    district = Column(String(100), nullable=False)
+    principal_name = Column(String(200), nullable=True)
+    phone = Column(String(15), nullable=True)
+    email = Column(String(150), nullable=True)
+    dise_code = Column(String(50), nullable=False, unique=True)
+    status = Column(String(50), default="Active")
+
+    def __repr__(self) -> str:
+        return f"<Institute id={self.id} name='{self.name}' district='{self.district}'>"

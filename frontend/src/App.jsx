@@ -163,11 +163,11 @@ function AppRoutes() {
       <Route
         path="/remedial-actions"
         element={
-          <ProtectedRoute>
+          <AdminRoute>
             <Layout>
               <RemedialActions />
             </Layout>
-          </ProtectedRoute>
+          </AdminRoute>
         }
       />
 

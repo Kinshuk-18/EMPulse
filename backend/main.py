@@ -99,6 +99,18 @@ def auto_fix_database():
             except Exception as e:
                 # Column might already exist
                 pass
+
+    from sqlalchemy.orm import Session
+    with Session(engine) as db:
+        if db.query(models.Institute).count() == 0:
+            institutes_data = [
+                models.Institute(name="Government ITI Aundh", district="Pune", principal_name="Dr. Anil Shrivastava", phone="9425112233", email="govt.iti.aundh@empulse", dise_code="MH-PUN-0012"),
+                models.Institute(name="VJTI Skill Center", district="Mumbai", principal_name="Prof. Meena Joshi", phone="9826445566", email="vjti.skill@empulse", dise_code="MH-MUM-0034"),
+                models.Institute(name="Government Polytechnic Pune", district="Pune", principal_name="Shri Rajesh Tiwari", phone="9111778899", email="govt.poly.pune@empulse", dise_code="MH-PUN-0056"),
+            ]
+            db.add_all(institutes_data)
+            db.commit()
+            print("Seeded Maharashtra institutes.")
 # CORS Middleware
 # CORS (Cross-Origin Resource Sharing) is a browser security mechanism that
 # blocks a web page from making requests to a different domain than the one
@@ -244,11 +256,14 @@ class InstituteResponse(BaseModel):
     id: int
     name: str
     district: str
-    principal_name: str
-    phone: str
-    email: str
+    principal_name: Optional[str]
+    phone: Optional[str]
+    email: Optional[str]
     dise_code: str
     status: str
+    enrolled_count: int = 0
+    active_courses: int = 0
+    placement_rate: float = 0.0
 
 
 # ROUTE 1 — Health Check
@@ -290,17 +305,17 @@ def login(req: LoginRequest):
         scope = "Global"
     elif clean_user == "nodal_officer1@empulse" and clean_pass == "nodal123":
         role = "nodal"
-        scope = "Bhopal"
-        district_val = "Bhopal"
+        scope = "Pune"
+        district_val = "Pune"
     elif clean_user == "institute1@empulse" and clean_pass == "inst123":
         role = "institute"
-        scope = "Government ITI Bhopal"
-        institute_val = "Government ITI Bhopal"
+        scope = "Government ITI Aundh"
+        institute_val = "Government ITI Aundh"
     elif clean_user == "user@empulse" and clean_pass == "user123":
         # Legacy fallback user mapping to institute role for compatibility
         role = "institute"
-        scope = "Government ITI Bhopal"
-        institute_val = "Government ITI Bhopal"
+        scope = "Government ITI Aundh"
+        institute_val = "Government ITI Aundh"
     else:
         # Fixed the casual error string before presentation so the judges don't cringe!
         raise HTTPException(status_code=401, detail="Invalid email or password. Please verify your credentials and try again.")
@@ -415,10 +430,10 @@ def get_all_trainees(
         clean_scope = scope.strip() if scope else None
 
         if clean_role == "nodal" or (district and district.strip()):
-            target_district = district.strip() if (district and district.strip()) else (clean_scope or "Bhopal")
+            target_district = district.strip() if (district and district.strip()) else (clean_scope or "Pune")
             query = query.filter(models.Trainee.district.ilike(f"%{target_district}%"))
         elif clean_role == "institute" or (institute_name and institute_name.strip()):
-            target_inst = institute_name.strip() if (institute_name and institute_name.strip()) else (clean_scope or "Government ITI Bhopal")
+            target_inst = institute_name.strip() if (institute_name and institute_name.strip()) else (clean_scope or "Government ITI Aundh")
             query = query.filter(models.Trainee.institute_name.ilike(f"%{target_inst}%"))
 
         if employment_type and employment_type.strip():
@@ -678,14 +693,46 @@ def delete_nodal_officer(officer_id: int):
     response_model=List[InstituteResponse],
     tags=["Admin — Institutes"],
     summary="List all Training Institutes",
-    description="Admin-only. Returns the full list of registered Training Institutes.",
+    description="Admin-only. Returns the full list of registered Training Institutes with analytics metadata.",
 )
-def get_institutes():
-    """
-    // Wired up the institutes GET — needed for the admin institutes management page.
-    // Phone numbers will be masked on the frontend, raw data here.
-    """
-    return _institutes_store
+def get_institutes(db: Session = Depends(get_db)):
+    institutes = db.query(models.Institute).all()
+    results = []
+    
+    from collections import defaultdict
+    trainees = db.query(models.Trainee).all()
+    
+    enrolled_counts = defaultdict(int)
+    active_courses_sets = defaultdict(set)
+    employed_counts = defaultdict(int)
+    
+    for t in trainees:
+        enrolled_counts[t.institute_name] += 1
+        if t.course_name:
+            active_courses_sets[t.institute_name].add(t.course_name)
+        if t.current_status in (models.TraineeStatus.EMPLOYED, models.TraineeStatus.SELF_EMPLOYED):
+            employed_counts[t.institute_name] += 1
+            
+    for inst in institutes:
+        total = enrolled_counts[inst.name]
+        emp = employed_counts[inst.name]
+        placement_rate = (emp / total * 100) if total > 0 else 0.0
+        
+        results.append({
+            "id": inst.id,
+            "name": inst.name,
+            "district": inst.district,
+            "principal_name": inst.principal_name,
+            "phone": inst.phone,
+            "email": inst.email,
+            "dise_code": inst.dise_code,
+            "status": inst.status,
+            "enrolled_count": total,
+            "active_courses": len(active_courses_sets[inst.name]),
+            "placement_rate": round(placement_rate, 2),
+        })
+        
+    return results
 
 
 @app.post(
@@ -696,38 +743,40 @@ def get_institutes():
     summary="Register a new Training Institute",
     description="Admin-only. Creates and stores a new Institute record.",
 )
-def create_institute(institute_data: InstituteCreate):
-    """
-    // Quick in-memory insert for demo. Prod would write to a proper institutes table.
-    // DISE code uniqueness check added so we don't get duplicate institutes.
-    """
-    global _institute_id_counter
-
-    # Duplicate DISE code check — these should be globally unique
-    existing = next(
-        (i for i in _institutes_store if i["dise_code"].upper() == institute_data.dise_code.upper()),
-        None
-    )
+def create_institute(institute_data: InstituteCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.Institute).filter(models.Institute.dise_code == institute_data.dise_code).first()
     if existing:
         raise HTTPException(
             status_code=400,
             detail="An Institute with this DISE code already exists.",
         )
 
-    new_institute = {
-        "id": _institute_id_counter,
-        "name": institute_data.name,
-        "district": institute_data.district,
-        "principal_name": institute_data.principal_name,
-        "phone": institute_data.phone,
-        "email": institute_data.email.strip().lower(),
-        "dise_code": institute_data.dise_code.upper().strip(),
-        "status": "Active",
+    new_institute = models.Institute(
+        name=institute_data.name,
+        district=institute_data.district,
+        principal_name=institute_data.principal_name,
+        phone=institute_data.phone,
+        email=institute_data.email.strip().lower(),
+        dise_code=institute_data.dise_code.upper().strip(),
+        status="Active",
+    )
+    db.add(new_institute)
+    db.commit()
+    db.refresh(new_institute)
+    
+    return {
+        "id": new_institute.id,
+        "name": new_institute.name,
+        "district": new_institute.district,
+        "principal_name": new_institute.principal_name,
+        "phone": new_institute.phone,
+        "email": new_institute.email,
+        "dise_code": new_institute.dise_code,
+        "status": new_institute.status,
+        "enrolled_count": 0,
+        "active_courses": 0,
+        "placement_rate": 0.0
     }
-    _institutes_store.append(new_institute)
-    _institute_id_counter += 1
-    return new_institute
-
 
 @app.delete(
     "/api/institutes/{institute_id}",
@@ -736,14 +785,8 @@ def create_institute(institute_data: InstituteCreate):
     summary="Remove a Training Institute",
     description="Admin-only. Permanently removes a Training Institute from the system.",
 )
-def delete_institute(institute_id: int):
-    """
-    // Soft-delete would be safer in production — but for demo, hard delete is fine.
-    // In prod: add deleted_at timestamp and filter it out of GET queries.
-    """
-    global _institutes_store
-
-    institute = next((i for i in _institutes_store if i["id"] == institute_id), None)
+def delete_institute(institute_id: int, db: Session = Depends(get_db)):
+    institute = db.query(models.Institute).filter(models.Institute.id == institute_id).first()
 
     if institute is None:
         raise HTTPException(
@@ -751,7 +794,8 @@ def delete_institute(institute_id: int):
             detail=f"Institute with id={institute_id} not found.",
         )
 
-    _institutes_store = [i for i in _institutes_store if i["id"] != institute_id]
+    db.delete(institute)
+    db.commit()
     return {"success": True, "message": f"Institute id={institute_id} removed successfully."}
 
 
@@ -996,16 +1040,20 @@ from sqlalchemy import func
 def get_longitudinal_analytics(
     role: Optional[str] = Query(None),
     scope: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    institute_name: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Trainee)
     clean_role = role.strip().lower() if role else None
     clean_scope = scope.strip() if scope else None
     
-    if clean_role == "nodal":
-        query = query.filter(models.Trainee.district.ilike(f"%{clean_scope}%"))
-    elif clean_role == "institute":
-        query = query.filter(models.Trainee.institute_name.ilike(f"%{clean_scope}%"))
+    if clean_role == "nodal" or (district and district.strip()):
+        target_district = district.strip() if (district and district.strip()) else (clean_scope or "Pune")
+        query = query.filter(models.Trainee.district.ilike(f"%{target_district}%"))
+    elif clean_role == "institute" or (institute_name and institute_name.strip()):
+        target_inst = institute_name.strip() if (institute_name and institute_name.strip()) else (clean_scope or "Government ITI Aundh")
+        query = query.filter(models.Trainee.institute_name.ilike(f"%{target_inst}%"))
         
     trainees = query.all()
     
@@ -1049,6 +1097,36 @@ def get_longitudinal_analytics(
         "attrition_breakdown": attrition_breakdown,
         "skill_gap_breakdown": skill_gap_breakdown,
         "employment_category_distribution": employment_category_distribution
+    }
+
+@app.get("/api/dashboard/stats", tags=["Analytics"])
+def get_dashboard_stats(
+    role: Optional[str] = Query(None),
+    scope: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    institute_name: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Trainee)
+    clean_role = role.strip().lower() if role else None
+    clean_scope = scope.strip() if scope else None
+
+    if clean_role == "nodal" or (district and district.strip()):
+        target_district = district.strip() if (district and district.strip()) else (clean_scope or "Pune")
+        query = query.filter(models.Trainee.district.ilike(f"%{target_district}%"))
+    elif clean_role == "institute" or (institute_name and institute_name.strip()):
+        target_inst = institute_name.strip() if (institute_name and institute_name.strip()) else (clean_scope or "Government ITI Aundh")
+        query = query.filter(models.Trainee.institute_name.ilike(f"%{target_inst}%"))
+
+    total = query.count()
+    employed = query.filter(
+        models.Trainee.current_status.in_(["Employed", "Self-Employed"])
+    ).count()
+
+    return {
+        "total_trainees": total,
+        "verified_employed": employed,
+        "placement_rate": round((employed / total * 100), 1) if total > 0 else 0.0
     }
 
 @app.get("/api/remedial-actions", response_model=List[schemas.RemedialActionResponse], tags=["Analytics"])

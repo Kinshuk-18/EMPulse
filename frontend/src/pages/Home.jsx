@@ -308,7 +308,7 @@ export default function Home() {
                 >
                   <div>
                     <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <MapPin size={12} className="text-purple-600" /> Nodal Officer (Bhopal Region)
+                      <MapPin size={12} className="text-purple-600" /> Pune Nodal Officer
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono">nodal_officer1@empulse</div>
                   </div>
@@ -324,7 +324,7 @@ export default function Home() {
                 >
                   <div>
                     <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Building2 size={12} className="text-emerald-600" /> Institute (Govt ITI Bhopal)
+                      <Building2 size={12} className="text-emerald-600" /> Government ITI Aundh (Pune)
                     </div>
                     <div className="text-[11px] text-slate-500 font-mono">institute1@empulse</div>
                   </div>
