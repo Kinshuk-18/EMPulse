@@ -11,29 +11,62 @@ import {
   ShieldCheck,
   Building2,
   MapPin,
-  Headphones
+  Headphones,
+  Network,
+  TicketCheck,
 } from "lucide-react";
 
-// Hackathon dev comment: Added Help & Support (/contact) link accessible for all 3 RBAC roles
+// Role-aware nav config — each role sees only what's relevant to their scope.
+// Admin gets full management suite; Nodal and Institute get scoped operational views.
+function getNavLinks(role) {
+  if (role === "admin") {
+    return [
+      { to: "/dashboard",       label: "Dashboard",           icon: LayoutDashboard, end: true },
+      { to: "/trainees",        label: "Trainees",            icon: Users },
+      { to: "/analytics",       label: "Analytics",           icon: BarChart3 },
+      { to: "/nodal-officers",  label: "Nodal Officers",      icon: Network },
+      { to: "/institutes",      label: "Institutes",          icon: Building2 },
+      { to: "/support-tickets", label: "Support Tickets",     icon: TicketCheck },
+      { to: "/settings",        label: "Settings",            icon: Settings },
+    ];
+  }
+
+  if (role === "nodal") {
+    return [
+      { to: "/dashboard", label: "Dashboard",      icon: LayoutDashboard, end: true },
+      { to: "/trainees",  label: "Trainees",       icon: Users },
+      { to: "/analytics", label: "Analytics",      icon: BarChart3 },
+      { to: "/contact",   label: "Help & Support", icon: Headphones },
+      { to: "/settings",  label: "Settings",       icon: Settings },
+    ];
+  }
+
+  // Institute role — same shape as Nodal but scoped to their center
+  return [
+    { to: "/dashboard", label: "Dashboard",      icon: LayoutDashboard, end: true },
+    { to: "/trainees",  label: "Trainees",       icon: Users },
+    { to: "/analytics", label: "Analytics",      icon: BarChart3 },
+    { to: "/contact",   label: "Help & Support", icon: Headphones },
+    { to: "/settings",  label: "Settings",       icon: Settings },
+  ];
+}
+
 export default function Sidebar({ isOpen, onClose }) {
   const { user, role, scope, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // Navigation links for 3-tier RBAC - Help & Support visible for ALL 3 roles
-  const navLinks = [
-    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
-    { to: "/trainees", label: "Trainees", icon: Users },
-    { to: "/analytics", label: "Analytics", icon: BarChart3 },
-    { to: "/contact", label: "Help & Support", icon: Headphones },
-    { to: "/settings", label: "Settings", icon: Settings },
-  ];
+  const navLinks = getNavLinks(role);
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
-  const initial = user ? user.charAt(0).toUpperCase() : (role ? role.charAt(0).toUpperCase() : "E");
+  const initial = user
+    ? user.charAt(0).toUpperCase()
+    : role
+    ? role.charAt(0).toUpperCase()
+    : "E";
 
   let displayName = "System Admin";
   let RoleIcon = ShieldCheck;
@@ -45,8 +78,10 @@ export default function Sidebar({ isOpen, onClose }) {
     RoleIcon = Building2;
   }
 
-  // Clean user display string without .io
-  const cleanUserDisplay = user ? user.replace(".io", "") : `${role || 'user'}@empulse`;
+  // Strip any legacy .io suffix from the stored user email
+  const cleanUserDisplay = user
+    ? user.replace(".io", "")
+    : `${role || "user"}@empulse`;
 
   return (
     <>
@@ -88,15 +123,16 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-6 space-y-0.5 overflow-y-auto">
           <div className="px-3 mb-3 flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
               Navigation Menu
             </p>
             <span className="text-[10px] font-semibold bg-indigo-50 text-[#6c5ce7] px-2 py-0.5 rounded capitalize">
-              {role || 'admin'}
+              {role || "admin"}
             </span>
           </div>
+
           {navLinks.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -104,8 +140,7 @@ export default function Sidebar({ isOpen, onClose }) {
               end={end}
               onClick={onClose}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group
-                ${
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group ${
                   isActive
                     ? "text-white shadow-md shadow-[#6c5ce7]/20"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"

@@ -38,9 +38,32 @@ export default function Contact() {
     e.preventDefault();
     setLoading(true);
 
-    // Simulated ticket dispatch for demo presentation
+    // Simulated ticket dispatch — in prod this would POST to /api/support-tickets
+    // For now we persist to localStorage so the admin SupportTickets page can read it
     setTimeout(() => {
       const randomTicket = `EM-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // Persist ticket to localStorage so the admin panel can surface it
+      try {
+        const LS_KEY = 'empulse_support_tickets';
+        const existing = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+        const newTicket = {
+          id: randomTicket,
+          fullName: formData.fullName,
+          email: formData.email,
+          roleScope: formData.roleScope,
+          role: role || 'unknown',
+          subject: formData.subject,
+          message: formData.message,
+          timestamp: new Date().toISOString(),
+          status: 'Pending',
+        };
+        localStorage.setItem(LS_KEY, JSON.stringify([newTicket, ...existing]));
+      } catch {
+        // localStorage might be unavailable in some environments — fail silently
+        console.warn('Contact: Could not persist ticket to localStorage');
+      }
+
       setTicketId(randomTicket);
       setLoading(false);
       setSubmitted(true);
@@ -69,7 +92,7 @@ export default function Contact() {
             <Headphones size={14} /> Official Support Desk
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Helpdesk & Nodal Technical Support
+            National Helpdesk &amp; Technical Support
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-gray-500">
             Dedicated assistance for Regional Nodal Officers, ITI Principals, and National System Administrators.
