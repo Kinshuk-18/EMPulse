@@ -368,14 +368,14 @@ export default function Analytics() {
                       <div
                         className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
                         style={{
-                          width: `${Math.round(Math.min(Math.max((c.total / maxCourseTotal) * 100, 0), 100))}%`,
+                          width: '100%',
                           backgroundColor: '#e5e7eb',
                         }}
                       />
                       <div
                         className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
                         style={{
-                          width: `${Math.round(Math.min(Math.max((c.employed / maxCourseTotal) * 100, 0), 100))}%`,
+                          width: `${c.rate}%`,
                           backgroundColor: c.rate >= 60 ? '#22c55e' : c.rate >= 35 ? '#f59e0b' : '#ef4444',
                         }}
                       />
@@ -401,21 +401,21 @@ export default function Analytics() {
                   <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl">
                     <div>
                       <p className="text-xs text-gray-500">Initial Wage</p>
-                      <p className="font-bold text-gray-900">₹{Math.round(longData.wage_progression?.average_initial || 0).toLocaleString()}</p>
+                      <p className="font-bold text-gray-900">₹{Math.round(longData.avg_wage_initial || 0).toLocaleString()}</p>
                     </div>
                     <ArrowUpRight className="text-emerald-500" />
                     <div className="text-right">
                       <p className="text-xs text-gray-500">Current Wage</p>
-                      <p className="font-bold text-emerald-600">₹{Math.round(longData.wage_progression?.average_current || 0).toLocaleString()}</p>
+                      <p className="font-bold text-emerald-600">₹{Math.round(longData.avg_wage_current || 0).toLocaleString()}</p>
                     </div>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">Wage Growth</span>
-                    <span className="font-bold text-emerald-600">+{longData.wage_progression?.growth_percent?.toFixed(1) || 0}%</span>
+                    <span className="font-bold text-emerald-600">+{longData.avg_wage_growth_pct?.toFixed(1) || 0}%</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">Training Relevance Score</span>
-                    <span className="font-bold text-indigo-600">{longData.training_relevance?.average_score?.toFixed(1) || 0}%</span>
+                    <span className="font-bold text-indigo-600">{longData.avg_relevance_score?.toFixed(1) || 0}%</span>
                   </div>
                 </div>
               </SectionCard>
@@ -428,25 +428,25 @@ export default function Analytics() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Top Skill Gaps</h4>
-                    {Object.entries(longData.skill_gaps || {}).map(([gap, count]) => (
+                    {Object.entries(longData.skill_gap_breakdown || {}).map(([gap, count]) => (
                       <div key={gap} className="flex justify-between text-xs mb-1">
                         <span className="text-gray-700 truncate pr-2">{gap}</span>
                         <span className="font-bold text-gray-900">{count}</span>
                       </div>
                     ))}
-                    {Object.keys(longData.skill_gaps || {}).length === 0 && (
+                    {Object.keys(longData.skill_gap_breakdown || {}).length === 0 && (
                       <p className="text-xs text-gray-400">No skill gap data.</p>
                     )}
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Attrition Reasons</h4>
-                    {Object.entries(longData.attrition_reasons || {}).map(([reason, count]) => (
+                    {Object.entries(longData.attrition_breakdown || {}).map(([reason, count]) => (
                       <div key={reason} className="flex justify-between text-xs mb-1">
                         <span className="text-gray-700 truncate pr-2">{reason}</span>
                         <span className="font-bold text-red-600">{count}</span>
                       </div>
                     ))}
-                    {Object.keys(longData.attrition_reasons || {}).length === 0 && (
+                    {Object.keys(longData.attrition_breakdown || {}).length === 0 && (
                       <p className="text-xs text-gray-400">No attrition data.</p>
                     )}
                   </div>
@@ -559,7 +559,7 @@ export default function Analytics() {
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{
-                            width: `${Math.round(Math.min(Math.max((s.total / maxSectorTotal) * 100, 0), 100))}%`,
+                            width: `${s.rate}%`,
                             backgroundColor: s.color,
                           }}
                         />
@@ -706,7 +706,7 @@ export default function Analytics() {
                           <div
                             className="h-full rounded-full transition-all duration-700"
                             style={{
-                              width: `${Math.round(Math.min(Math.max((e.total / maxT) * 100, 0), 100))}%`,
+                              width: `${e.rate}%`,
                               backgroundColor: instColors[i % instColors.length],
                             }}
                           />

@@ -229,7 +229,7 @@ export default function Home() {
                     type="email"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="admin@empulse"
+                    placeholder="admin@empulse.gov.in"
                     required
                     className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6c5ce7] focus:bg-white transition-all"
                   />
@@ -287,14 +287,14 @@ export default function Home() {
               <div className="space-y-2">
                 <button
                   type="button"
-                  onClick={() => fillCredentials('admin@empulse', 'admin123')}
+                  onClick={() => fillCredentials('admin@empulse.gov.in', 'admin123')}
                   className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition flex items-center justify-between group cursor-pointer"
                 >
                   <div>
                     <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                       <Users size={12} className="text-[#6c5ce7]" /> Admin (Global Access)
                     </div>
-                    <div className="text-[11px] text-slate-500 font-mono">admin@empulse</div>
+                    <div className="text-[11px] text-slate-500 font-mono">admin@empulse.gov.in</div>
                   </div>
                   <span className="text-[10px] font-semibold bg-[#6c5ce7]/10 text-[#6c5ce7] px-2 py-0.5 rounded group-hover:bg-[#6c5ce7] group-hover:text-white transition">
                     Fill Admin
@@ -303,14 +303,14 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => fillCredentials('nodal_officer1@empulse', 'nodal123')}
+                  onClick={() => fillCredentials('pune.nodal@empulse.gov.in', 'nodal123')}
                   className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition flex items-center justify-between group cursor-pointer"
                 >
                   <div>
                     <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                       <MapPin size={12} className="text-purple-600" /> Pune Nodal Officer
                     </div>
-                    <div className="text-[11px] text-slate-500 font-mono">nodal_officer1@empulse</div>
+                    <div className="text-[11px] text-slate-500 font-mono">pune.nodal@empulse.gov.in</div>
                   </div>
                   <span className="text-[10px] font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded group-hover:bg-purple-600 group-hover:text-white transition">
                     Fill Nodal
@@ -319,14 +319,14 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => fillCredentials('institute1@empulse', 'inst123')}
+                  onClick={() => fillCredentials('pune.iti@empulse.gov.in', 'inst123')}
                   className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-left transition flex items-center justify-between group cursor-pointer"
                 >
                   <div>
                     <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                       <Building2 size={12} className="text-emerald-600" /> Government ITI Aundh (Pune)
                     </div>
-                    <div className="text-[11px] text-slate-500 font-mono">institute1@empulse</div>
+                    <div className="text-[11px] text-slate-500 font-mono">pune.iti@empulse.gov.in</div>
                   </div>
                   <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded group-hover:bg-emerald-600 group-hover:text-white transition">
                     Fill Institute

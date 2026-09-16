@@ -101,16 +101,8 @@ def auto_fix_database():
                 pass
 
     from sqlalchemy.orm import Session
-    with Session(engine) as db:
-        if db.query(models.Institute).count() == 0:
-            institutes_data = [
-                models.Institute(name="Government ITI Aundh", district="Pune", principal_name="Dr. Anil Shrivastava", phone="9425112233", email="govt.iti.aundh@empulse", dise_code="MH-PUN-0012"),
-                models.Institute(name="VJTI Skill Center", district="Mumbai", principal_name="Prof. Meena Joshi", phone="9826445566", email="vjti.skill@empulse", dise_code="MH-MUM-0034"),
-                models.Institute(name="Government Polytechnic Pune", district="Pune", principal_name="Shri Rajesh Tiwari", phone="9111778899", email="govt.poly.pune@empulse", dise_code="MH-PUN-0056"),
-            ]
-            db.add_all(institutes_data)
-            db.commit()
-            print("Seeded Maharashtra institutes.")
+    # Institute seeding is now fully handled in seed.py.
+    # No auto-seeding here to prevent conflicts.
 # CORS Middleware
 # CORS (Cross-Origin Resource Sharing) is a browser security mechanism that
 # blocks a web page from making requests to a different domain than the one
@@ -300,22 +292,22 @@ def login(req: LoginRequest):
     district_val = None
     institute_val = None
 
-    if clean_user == "admin@empulse" and clean_pass == "admin123":
+    if clean_user == "admin@empulse.gov.in" and clean_pass == "admin123":
         role = "admin"
         scope = "Global"
-    elif clean_user == "nodal_officer1@empulse" and clean_pass == "nodal123":
+    elif clean_user == "pune.nodal@empulse.gov.in" and clean_pass == "nodal123":
         role = "nodal"
         scope = "Pune"
         district_val = "Pune"
-    elif clean_user == "institute1@empulse" and clean_pass == "inst123":
+    elif clean_user == "pune.iti@empulse.gov.in" and clean_pass == "inst123":
         role = "institute"
-        scope = "Government ITI Aundh"
-        institute_val = "Government ITI Aundh"
+        scope = "Government ITI Aundh (Pune)"
+        institute_val = "Government ITI Aundh (Pune)"
     elif clean_user == "user@empulse" and clean_pass == "user123":
         # Legacy fallback user mapping to institute role for compatibility
         role = "institute"
-        scope = "Government ITI Aundh"
-        institute_val = "Government ITI Aundh"
+        scope = "Government ITI Aundh (Pune)"
+        institute_val = "Government ITI Aundh (Pune)"
     else:
         # Fixed the casual error string before presentation so the judges don't cringe!
         raise HTTPException(status_code=401, detail="Invalid email or password. Please verify your credentials and try again.")
@@ -696,27 +688,36 @@ def delete_nodal_officer(officer_id: int):
     description="Admin-only. Returns the full list of registered Training Institutes with analytics metadata.",
 )
 def get_institutes(db: Session = Depends(get_db)):
-    institutes = db.query(models.Institute).all()
+    from sqlalchemy import func
+    
+    # 1. Create a subquery that groups trainees by institute
+    stats_query = db.query(
+        models.Trainee.institute_name,
+        func.count(models.Trainee.id).label('total_trainees'),
+        func.count(func.distinct(models.Trainee.course_name)).label('active_courses'),
+        func.sum(
+            func.case(
+                (models.Trainee.current_status.in_([models.TraineeStatus.EMPLOYED, models.TraineeStatus.SELF_EMPLOYED]), 1),
+                else_=0
+            )
+        ).label('placed_trainees')
+    ).group_by(models.Trainee.institute_name).subquery()
+
+    # 2. Join the institutes table with the grouped stats
+    institutes = db.query(
+        models.Institute,
+        stats_query.c.total_trainees,
+        stats_query.c.active_courses,
+        stats_query.c.placed_trainees
+    ).outerjoin(
+        stats_query, models.Institute.name == stats_query.c.institute_name
+    ).all()
+    
     results = []
-    
-    from collections import defaultdict
-    trainees = db.query(models.Trainee).all()
-    
-    enrolled_counts = defaultdict(int)
-    active_courses_sets = defaultdict(set)
-    employed_counts = defaultdict(int)
-    
-    for t in trainees:
-        enrolled_counts[t.institute_name] += 1
-        if t.course_name:
-            active_courses_sets[t.institute_name].add(t.course_name)
-        if t.current_status in (models.TraineeStatus.EMPLOYED, models.TraineeStatus.SELF_EMPLOYED):
-            employed_counts[t.institute_name] += 1
-            
-    for inst in institutes:
-        total = enrolled_counts[inst.name]
-        emp = employed_counts[inst.name]
-        placement_rate = (emp / total * 100) if total > 0 else 0.0
+    for inst, total, courses, placed in institutes:
+        total_val = total or 0
+        placed_val = placed or 0
+        placement_rate = (float(placed_val) / total_val * 100) if total_val > 0 else 0.0
         
         results.append({
             "id": inst.id,
@@ -727,8 +728,8 @@ def get_institutes(db: Session = Depends(get_db)):
             "email": inst.email,
             "dise_code": inst.dise_code,
             "status": inst.status,
-            "enrolled_count": total,
-            "active_courses": len(active_courses_sets[inst.name]),
+            "enrolled_count": total_val,
+            "active_courses": courses or 0,
             "placement_rate": round(placement_rate, 2),
         })
         
@@ -1066,6 +1067,9 @@ def get_longitudinal_analytics(
     avg_wage_growth_inr = avg_wage_current - avg_wage_initial
     avg_wage_growth_pct = (avg_wage_growth_inr / avg_wage_initial * 100) if avg_wage_initial > 0 else 0
     
+    relevance_scores = [t.training_relevance_score for t in trainees if t.training_relevance_score is not None]
+    avg_relevance_score = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0
+    
     relevance_score_distribution = {"high": 0, "medium": 0, "low": 0}
     attrition_breakdown = {}
     skill_gap_breakdown = {}
@@ -1091,8 +1095,11 @@ def get_longitudinal_analytics(
             employment_category_distribution[emp] = employment_category_distribution.get(emp, 0) + 1
 
     return {
+        "avg_wage_initial": round(avg_wage_initial, 2),
+        "avg_wage_current": round(avg_wage_current, 2),
         "avg_wage_growth_pct": round(avg_wage_growth_pct, 2),
         "avg_wage_growth_inr": round(avg_wage_growth_inr, 2),
+        "avg_relevance_score": round(avg_relevance_score, 2),
         "relevance_score_distribution": relevance_score_distribution,
         "attrition_breakdown": attrition_breakdown,
         "skill_gap_breakdown": skill_gap_breakdown,
@@ -1131,32 +1138,87 @@ def get_dashboard_stats(
 
 @app.get("/api/remedial-actions", response_model=List[schemas.RemedialActionResponse], tags=["Analytics"])
 def get_remedial_actions(db: Session = Depends(get_db)):
-    actions = [
-        {
-            "id": "ACT-001",
-            "triggering_evidence": "Government ITI Nashik shows 42% attrition due to 'Low Local Wages'",
-            "recommended_action": "Reallocate 15% sectoral funding to High-Placement EV Trade",
-            "action_type": "Funding Reallocation",
-            "target_entity": "Government ITI Nashik",
-            "impact_estimate": "+12% Placement Rate"
-        },
-        {
-            "id": "ACT-002",
-            "triggering_evidence": "CNC Machine Operation trade has <5% wage growth over 12 months",
-            "recommended_action": "Issue Mandatory Curriculum Audit for CNC Trade",
-            "action_type": "Curriculum Update",
-            "target_entity": "State-wide CNC Courses",
-            "impact_estimate": "+8% Wage Growth"
-        },
-        {
-            "id": "ACT-003",
-            "triggering_evidence": "Pune District shows recurring 'English Communication' skill gap",
-            "recommended_action": "Introduce Soft Skills & English Crash Course",
+    actions = []
+    from sqlalchemy import func
+    import random
+    
+    # 1. Low Placement (<50%)
+    inst_stats = db.query(
+        models.Trainee.institute_name,
+        func.count(models.Trainee.id).label('total'),
+        func.sum(
+            func.case(
+                (models.Trainee.current_status.in_([models.TraineeStatus.EMPLOYED, models.TraineeStatus.SELF_EMPLOYED]), 1),
+                else_=0
+            )
+        ).label('placed')
+    ).group_by(models.Trainee.institute_name).all()
+    
+    for inst_name, total, placed in inst_stats:
+        if total and total > 0:
+            rate = float(placed or 0) / total * 100
+            if rate < 50:
+                actions.append({
+                    "id": f"ACT-PL-{random.randint(100,999)}",
+                    "triggering_evidence": f"{inst_name} shows {round(rate, 1)}% placement rate",
+                    "recommended_action": "Reallocate 15% sectoral funding to High-Placement Trades",
+                    "action_type": "Funding Reallocation",
+                    "target_entity": inst_name,
+                    "impact_estimate": "+12% Placement Rate"
+                })
+
+    # 2. High Attrition
+    top_attrition = db.query(
+        models.Trainee.attrition_reason,
+        func.count(models.Trainee.id).label('count')
+    ).filter(models.Trainee.attrition_reason.isnot(None)).group_by(models.Trainee.attrition_reason).order_by(func.count(models.Trainee.id).desc()).first()
+    
+    if top_attrition:
+        actions.append({
+            "id": f"ACT-AT-{random.randint(100,999)}",
+            "triggering_evidence": f"State-wide high attrition due to '{top_attrition[0]}'",
+            "recommended_action": "Introduce Special Interventions for Attrition Risk",
+            "action_type": "Policy Change",
+            "target_entity": "State-wide",
+            "impact_estimate": "-5% Attrition"
+        })
+
+    # 3. Wage Stagnation (<10% growth)
+    course_wages = db.query(
+        models.Trainee.course_name,
+        func.avg(models.Trainee.wage_initial).label('avg_init'),
+        func.avg(models.Trainee.wage_current).label('avg_curr')
+    ).filter(models.Trainee.wage_initial.isnot(None), models.Trainee.wage_current.isnot(None)).group_by(models.Trainee.course_name).all()
+    
+    for c_name, a_init, a_curr in course_wages:
+        if a_init and a_curr and a_init > 0:
+            growth = (a_curr - a_init) / a_init * 100
+            if growth < 10:
+                actions.append({
+                    "id": f"ACT-WG-{random.randint(100,999)}",
+                    "triggering_evidence": f"{c_name} trade has {round(growth, 1)}% wage growth over 12 months",
+                    "recommended_action": f"Issue Mandatory Curriculum Audit for {c_name} Trade",
+                    "action_type": "Curriculum Update",
+                    "target_entity": f"State-wide {c_name} Courses",
+                    "impact_estimate": "+8% Wage Growth"
+                })
+
+    # 4. Skill Gap
+    top_gap = db.query(
+        models.Trainee.skill_gap_identified,
+        func.count(models.Trainee.id).label('count')
+    ).filter(models.Trainee.skill_gap_identified.isnot(None)).group_by(models.Trainee.skill_gap_identified).order_by(func.count(models.Trainee.id).desc()).first()
+    
+    if top_gap:
+        actions.append({
+            "id": f"ACT-SG-{random.randint(100,999)}",
+            "triggering_evidence": f"State-wide recurring '{top_gap[0]}' skill gap",
+            "recommended_action": f"Introduce Crash Course for {top_gap[0]}",
             "action_type": "Program Addition",
-            "target_entity": "Pune District ITIs",
+            "target_entity": "State-wide ITIs",
             "impact_estimate": "-15% Attrition"
-        }
-    ]
+        })
+
     return actions
 
 @app.post("/api/remedial-actions/apply", tags=["Analytics"])
