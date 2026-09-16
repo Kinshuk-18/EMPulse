@@ -97,8 +97,13 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Local dev servers — both ports in case someone runs on 3000
         "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        # Production frontend deployments — add any new Vercel/Render URLs here
         "https://empulse-io.vercel.app",
+        "https://empulse-frontend.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -324,6 +329,13 @@ def create_trainee(
         db.add(new_trainee)      # stage the INSERT
         db.commit()              # commit the transaction to MySQL
         db.refresh(new_trainee)  # populate new_trainee.id from the DB auto-increment
+
+        # Auto-generate the human-readable public ID now that we have the DB row id.
+        # Format: EMP-MH-2026-XXXX — state code + cohort year + zero-padded sequence.
+        # Seeding Maharashtra cohort for the national demo — MH is Maharashtra's code.
+        new_trainee.unique_emp_id = f"EMP-MH-2026-{new_trainee.id:04d}"
+        db.commit()              # persist the unique_emp_id back to the same row
+        db.refresh(new_trainee)  # reload to get the final complete object
 
         return new_trainee       # Pydantic + schemas.TraineeResponse serialise this
 

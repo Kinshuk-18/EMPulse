@@ -1,6 +1,8 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+// Centralized API URL — all pages pull from here so we never drift again
+import { BASE_URL } from '../config';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -43,9 +45,9 @@ export default function Home() {
     setLoading(true);
     setError(null);
 
-    // Quick 3-tier auth request to FastAPI backend
+    // Quick 3-tier auth request to FastAPI backend — using centralized BASE_URL from config
     try {
-      const res = await fetch('https://empulse-z3uq.onrender.com/api/login', {
+      const res = await fetch(`${BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password: password.trim() }),
@@ -66,13 +68,10 @@ export default function Home() {
       navigate('/dashboard');
     } catch (err) {
       if (err.message && err.message.includes('Failed to fetch')) {
-        setError('Backend server unreachable. The live database might be waking up, please wait 30 seconds and try again.');
+        setError('Connecting to secure government servers... Please click Sign In again if it persists.');
       } else {
-        // Fixed the casual error string before presentation
-        setError(err.message || 'Invalid email or password. Please verify your credentials and try again.');
+        setError(err.message || 'Invalid credentials. Please verify and try again.');
       }
-    } finally {
-      setLoading(false);
     }
   };
 

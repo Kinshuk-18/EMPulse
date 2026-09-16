@@ -24,6 +24,7 @@ Pydantic version: v2 (uses  model_config  dict, NOT the inner  class Config)
 """
 
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -199,6 +200,14 @@ class TraineeResponse(TraineeBase):
         ...,
         description="Auto-generated unique identifier for this trainee.",
         examples=[1],
+    )
+
+    # System-generated after INSERT — never sent by the client.
+    # Format: EMP-MH-2026-0001. Optional so existing rows without it don't break.
+    unique_emp_id: Optional[str] = Field(
+        None,
+        description="Human-readable public trainee ID (e.g. EMP-MH-2026-0001). System-generated.",
+        examples=["EMP-MH-2026-0001"],
     )
 
     graduation_date: datetime = Field(

@@ -18,16 +18,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { maskPhone, maskEmail } from '../utils/masking';
-
-const API_BASE = 'http://127.0.0.1:8000';
-
-async function apiFetch(path, options = {}) {
-  try {
-    return await fetch(`${API_BASE}${path}`, options);
-  } catch {
-    return fetch(`http://localhost:8000${path}`, options);
-  }
-}
+// Centralized API URL — wired to the live Render backend for all institute CRUD ops
+import { BASE_URL } from '../config';
 
 function DetailRow({ icon: Icon, label, value, sensitive }) {
   return (
@@ -77,7 +69,7 @@ export default function Institutes() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch('/api/institutes');
+      const res = await fetch(`${BASE_URL}/api/institutes`);
       if (!res.ok) throw new Error(`API ${res.status}`);
       setInstitutes(await res.json());
     } catch {
@@ -105,7 +97,7 @@ export default function Institutes() {
     e.preventDefault();
     setAddLoading(true);
     try {
-      const res = await apiFetch('/api/institutes', {
+      const res = await fetch(`${BASE_URL}/api/institutes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -129,7 +121,7 @@ export default function Institutes() {
     if (!window.confirm('Permanently remove this Training Institute from the system?')) return;
     setDeletingId(id);
     try {
-      const res = await apiFetch(`/api/institutes/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${BASE_URL}/api/institutes/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || 'Delete failed');

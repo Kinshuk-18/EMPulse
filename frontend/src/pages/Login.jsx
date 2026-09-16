@@ -1,6 +1,8 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+// Centralized API URL — mobile was failing on localhost, this fixes it globally
+import { BASE_URL } from '../config';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -23,40 +25,26 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
-    // Quick JWT hack for the demo - supports both 127.0.0.1 and localhost
+    // Single clean request to the live Render backend — no more localhost fallback loops
     try {
-      let res;
-      try {
-        res = await fetch('http://127.0.0.1:8000/api/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ username: username.trim(), password: password.trim() }),
-        });
-      } catch (err) {
-        // Fallback to localhost if 127.0.0.1 network binding is being stubborn
-        res = await fetch('http://localhost:8000/api/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ username: username.trim(), password: password.trim() }),
-        });
-      }
+      const res = await fetch(`${BASE_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
+      });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || 'Invalid username or password. Please verify credentials.');
+        throw new Error(errData.detail || 'Invalid email or password. Please verify your credentials and try again.');
       }
 
       const data = await res.json();
-      
-      // Store token & role in context (supports access_token or token)
+
+      // Store token & role in context (supports access_token or token field)
       const token = data.access_token || data.token;
       login(data.username || username, data.role, token);
 
-      // Route based on role
+      // Route based on role — admin goes to dashboard, others to user view
       if (data.role === 'admin') {
         navigate('/');
       } else {
@@ -64,7 +52,7 @@ export default function Login() {
       }
     } catch (err) {
       if (err.message && err.message.includes('Failed to fetch')) {
-        setError('Cannot connect to backend server at http://127.0.0.1:8000. Please ensure Uvicorn is running.');
+        setError('Backend server unreachable. The live database might be waking up — please wait 30 seconds and try again.');
       } else {
         setError(err.message || 'Authentication failed. Please try again.');
       }

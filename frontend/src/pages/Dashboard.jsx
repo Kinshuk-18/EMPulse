@@ -1,5 +1,8 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { AuthContext } from "../context/AuthContext";
+// Centralized API URL because mobile was failing on localhost and the demo
+// kept breaking on WiFi-hotspot builds before the national presentation
+import { BASE_URL } from "../config";
 import {
   Users,
   Briefcase,
@@ -18,17 +21,6 @@ import {
   Activity,
 } from "lucide-react";
 
-const API_BASE = "http://127.0.0.1:8000";
-
-// Helper: try fetch on 127.0.0.1, fall back to localhost if binding is stubborn
-async function apiFetch(path, options = {}) {
-  try {
-    const res = await fetch(`${API_BASE}${path}`, options);
-    return res;
-  } catch {
-    return fetch(`http://localhost:8000${path}`, options);
-  }
-}
 
 // ── Reusable Metric Card component ────────────────────────────────────────────
 function MetricCard({ metric }) {
@@ -217,10 +209,9 @@ function ApiSyncButton() {
     setToastMsg("Pinging National Databases...");
 
     try {
-      // Fire the dummy backend endpoint — this is architectural proof, not
-      // a real EPFO integration. The endpoint logs the request and returns
-      // a simulated response payload that mirrors what the real API would return.
-      await apiFetch("/api/sync/national-databases", { method: "POST" });
+      // Firing the dummy backend endpoint to show EPFO sync architecture live
+      // Using BASE_URL so this works on mobile, tablet, and the demo laptop
+      await fetch(`${BASE_URL}/api/sync/national-databases`, { method: "POST" });
 
       // 2-second artificial delay to sell the "real API call" story to stakeholders
       await new Promise((r) => setTimeout(r, 2000));
@@ -453,7 +444,8 @@ export default function Dashboard() {
       if (district) params.append("district", district);
       if (instituteName) params.append("institute_name", instituteName);
 
-      const res = await apiFetch(`/api/trainees?${params.toString()}`);
+      // RBAC-scoped fetch — backend filters by role/district/institute automatically
+      const res = await fetch(`${BASE_URL}/api/trainees?${params.toString()}`);
 
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = await res.json();
@@ -461,7 +453,7 @@ export default function Dashboard() {
       setLastUpdated(new Date());
     } catch (err) {
       setError(
-        "Could not reach backend API at http://127.0.0.1:8000. Is uvicorn main:app --reload running?"
+        "Could not reach the backend API. Please check your connection or wait for the Render server to wake up."
       );
       console.error("Dashboard fetch error:", err);
     } finally {

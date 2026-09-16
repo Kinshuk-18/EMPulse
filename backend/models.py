@@ -74,6 +74,18 @@ class Trainee(Base):
         comment="Unique internal identifier for the trainee",
     )
 
+    # ── Human-Readable Public Trainee ID ─────────────────────────────────────────
+    # Format: EMP-MH-2026-XXXX (state code + cohort year + zero-padded sequence)
+    # Nullable so existing rows on the Aiven DB don't break on server restart.
+    # The seed script and create_trainee() API generate this after INSERT.
+    unique_emp_id = Column(
+        String(20),
+        nullable=True,           # nullable because legacy rows pre-date this column
+        unique=True,
+        index=True,
+        comment="Human-readable public ID e.g. EMP-MH-2026-0001 — used for search & display",
+    )
+
     # ── Personal Information ──────────────────────────────────────────────────
     name = Column(
         String(150),
@@ -144,7 +156,7 @@ class Trainee(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<Trainee id={self.id} name='{self.name}' "
+            f"<Trainee id={self.id} emp_id='{self.unique_emp_id}' name='{self.name}' "
             f"status='{self.current_status}' district='{self.district}'>"
         )
 

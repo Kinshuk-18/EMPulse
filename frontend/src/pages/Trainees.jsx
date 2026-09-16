@@ -1,10 +1,12 @@
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useSearch } from '../context/SearchContext';
+// Centralized API URL — switched from the old empulse-z3uq URL to the canonical deployment
+import { BASE_URL } from '../config';
 import {
   X, Eye, Trash2, Phone, Hash, Building2, BookOpen,
   MapPin, Briefcase, CalendarDays, ShieldAlert, Search,
-  Clock, CheckCircle2, Wifi, AlertCircle,
+  Clock, CheckCircle2, Wifi, AlertCircle, Fingerprint,
 } from 'lucide-react';
 import { maskPhone, maskAadhaar } from '../utils/masking';
 
@@ -263,7 +265,7 @@ export default function Trainees() {
       if (district) params.append('district', district);
       if (instituteName) params.append('institute_name', instituteName);
 
-      const res = await fetch(`https://empulse-z3uq.onrender.com/api/trainees?${params.toString()}`);
+      const res = await fetch(`${BASE_URL}/api/trainees?${params.toString()}`);
 
       if (!res.ok) throw new Error('Failed to fetch trainees from backend');
       const data = await res.json();
@@ -289,7 +291,7 @@ export default function Trainees() {
         graduation_date: new Date(formData.graduation_date).toISOString(),
       };
 
-      const res = await fetch('https://empulse-z3uq.onrender.com/api/trainees', {
+      const res = await fetch(`${BASE_URL}/api/trainees`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -330,7 +332,7 @@ export default function Trainees() {
 
     setDeletingId(traineeId);
     try {
-      const res = await fetch(`https://empulse-z3uq.onrender.com/api/trainees/${traineeId}`, {
+      const res = await fetch(`${BASE_URL}/api/trainees/${traineeId}`, {
         method: 'DELETE',
       });
 
@@ -355,6 +357,8 @@ export default function Trainees() {
     const verificationSource = getVerificationSource(t.id).toLowerCase();
     return (
       t.name?.toLowerCase().includes(q) ||
+      // Allow searching by the public Unique ID (e.g. EMP-MH-2026-0003)
+      t.unique_emp_id?.toLowerCase().includes(q) ||
       t.district?.toLowerCase().includes(q) ||
       t.institute_name?.toLowerCase().includes(q) ||
       t.course_name?.toLowerCase().includes(q) ||
@@ -391,7 +395,7 @@ export default function Trainees() {
           <input
             id="trainees-search"
             type="text"
-            placeholder="Search by name, source (EPFO, WhatsApp), district..."
+            placeholder="Search by Unique ID (EMP-MH-2026-0001), name, district, EPFO, WhatsApp..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#6c5ce7]/30 focus:border-[#6c5ce7] transition shadow-sm"
@@ -427,6 +431,8 @@ export default function Trainees() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  {/* Unique ID column — added for the national demo so officers can search by EMP-MH ID */}
+                  <th className="py-4 px-6">Unique ID</th>
                   <th className="py-4 px-6">Trainee Name</th>
                   {/* Masking PII in the table — raw data in modal only */}
                   <th className="py-4 px-6">Phone (Masked)</th>
@@ -443,7 +449,7 @@ export default function Trainees() {
               <tbody className="divide-y divide-gray-100 text-xs">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="py-12 text-center text-gray-400">
+                    <td colSpan="10" className="py-12 text-center text-gray-400">
                       {activeQuery
                         ? `No trainees match "${activeQuery}". Try EPFO, WhatsApp, a name, or district.`
                         : `No trainee records found for this scope (${scope || 'Global'}). Click "+ Add New Trainee" above.`}
@@ -452,6 +458,13 @@ export default function Trainees() {
                 ) : (
                   filtered.map((t) => (
                     <tr key={t.id} className="hover:bg-gray-50/80 transition-colors">
+                      {/* Unique ID badge — the searchable EMP-MH identifier for the national registry */}
+                      <td className="py-4 px-6">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-100 text-[11px] font-mono font-bold text-[#6c5ce7] whitespace-nowrap">
+                          <Fingerprint size={10} />
+                          {t.unique_emp_id || `EMP-MH-2026-${String(t.id).padStart(4, '0')}`}
+                        </span>
+                      </td>
                       <td className="py-4 px-6 font-semibold text-gray-900">{t.name}</td>
                       <td className="py-4 px-6 text-gray-500 font-mono">{maskPhone(t.phone)}</td>
                       <td className="py-4 px-6 text-gray-500 font-mono">{maskAadhaar(t.aadhaar_last_four)}</td>
@@ -491,7 +504,7 @@ export default function Trainees() {
                 <span className="font-semibold text-gray-600">{scope || 'Global'}</span>
               </span>
               <span className="text-[10px] font-mono text-gray-300">
-                Phone &amp; Aadhaar masked • Click 👁️ to reveal
+                Unique ID searchable • Phone &amp; Aadhaar masked • Click 👁️ to reveal
               </span>
             </div>
           )}
@@ -521,9 +534,14 @@ export default function Trainees() {
                 <h2 id="modal-trainee-name" className="text-lg font-bold text-gray-900">
                   {selectedTrainee.name}
                 </h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  ID #{selectedTrainee.id} • Unmasked PII View
-                </p>
+                {/* Unique ID badge — prominent so nodal officers can cross-reference quickly */}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#6c5ce7] text-white text-[11px] font-mono font-bold shadow-sm shadow-[#6c5ce7]/30">
+                    <Fingerprint size={10} />
+                    {selectedTrainee.unique_emp_id || `EMP-MH-2026-${String(selectedTrainee.id).padStart(4, '0')}`}
+                  </span>
+                  <p className="text-xs text-gray-400">DB #{selectedTrainee.id} • Unmasked PII View</p>
+                </div>
               </div>
               <button
                 id="modal-close-btn"

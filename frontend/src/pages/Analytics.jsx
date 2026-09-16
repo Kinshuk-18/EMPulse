@@ -19,16 +19,9 @@ import {
 
 // Deep analytics view based on user scope — this replaces the old placeholder stub
 // that was showing blank for Nodal and Institute roles.
+// Centralized API URL — no more localhost drift between team members' machines
+import { BASE_URL } from '../config';
 
-const API_BASE = 'http://127.0.0.1:8000';
-
-async function apiFetch(path, options = {}) {
-  try {
-    return await fetch(`${API_BASE}${path}`, options);
-  } catch {
-    return fetch(`http://localhost:8000${path}`, options);
-  }
-}
 
 // ── Reusable horizontal bar chart row ─────────────────────────────────────────
 function BarRow({ label, value, max, color, suffix = '', pctLabel }) {
@@ -171,7 +164,8 @@ export default function Analytics() {
       if (district) params.append('district', district);
       if (instituteName) params.append('institute_name', instituteName);
 
-      const res = await apiFetch(`/api/trainees?${params.toString()}`);
+      // RBAC-scoped trainee fetch — same filtering logic as Dashboard
+      const res = await fetch(`${BASE_URL}/api/trainees?${params.toString()}`);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = await res.json();
       setTrainees(data);

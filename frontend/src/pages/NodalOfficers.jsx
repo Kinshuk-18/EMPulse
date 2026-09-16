@@ -16,17 +16,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { maskPhone, maskEmail } from '../utils/masking';
-
-const API_BASE = 'http://127.0.0.1:8000';
-
-// Small helper so we don't repeat the 127.0.0.1 → localhost fallback pattern everywhere
-async function apiFetch(path, options = {}) {
-  try {
-    return await fetch(`${API_BASE}${path}`, options);
-  } catch {
-    return fetch(`http://localhost:8000${path}`, options);
-  }
-}
+// Centralized API URL — every fetch call goes to Render, never localhost
+import { BASE_URL } from '../config';
 
 // Masked label with sensitive indicator
 function DetailRow({ icon: Icon, label, value, sensitive }) {
@@ -78,7 +69,7 @@ export default function NodalOfficers() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch('/api/nodal-officers');
+      const res = await fetch(`${BASE_URL}/api/nodal-officers`);
       if (!res.ok) throw new Error(`API ${res.status}`);
       setOfficers(await res.json());
     } catch {
@@ -105,7 +96,7 @@ export default function NodalOfficers() {
     e.preventDefault();
     setAddLoading(true);
     try {
-      const res = await apiFetch('/api/nodal-officers', {
+      const res = await fetch(`${BASE_URL}/api/nodal-officers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -129,7 +120,7 @@ export default function NodalOfficers() {
     if (!window.confirm('Permanently remove this Nodal Officer from the system?')) return;
     setDeletingId(id);
     try {
-      const res = await apiFetch(`/api/nodal-officers/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${BASE_URL}/api/nodal-officers/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || 'Delete failed');
