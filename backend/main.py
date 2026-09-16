@@ -34,6 +34,8 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from sqlalchemy import text
+from database import engine
 # Internal modules ──────────────────────────────────────────────────────────
 from database import engine, get_db, Base
 import models
@@ -75,6 +77,17 @@ app = FastAPI(
     lifespan=lifespan,  # wire up our startup/shutdown logic
 )
 
+@app.on_event("startup")
+def auto_fix_database():
+    """Automatically ensures missing columns exist on startup to prevent 500 crashes"""
+    try:
+        with engine.connect() as connection:
+            # Try adding the column; if it already exists, MySQL will ignore or error safely
+            connection.execute(text("ALTER TABLE trainees ADD COLUMN unique_emp_id VARCHAR(50) DEFAULT NULL;"))
+            connection.commit()
+            print("Successfully ensured unique_emp_id column exists.")
+    except Exception as e:
+        print("Database startup check note (column may already exist):", e)
 # CORS Middleware
 # CORS (Cross-Origin Resource Sharing) is a browser security mechanism that
 # blocks a web page from making requests to a different domain than the one
@@ -231,12 +244,16 @@ class InstituteResponse(BaseModel):
 # GET /
 
 @app.get("/", tags=["Health"])
-def health_check():
+def root_health_check():
     """
     Ping endpoint to confirm the API server is alive.
     Useful for uptime monitors and quick sanity checks during demos.
     """
     return {"status": "EMPulse API is running ✅"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "EMPulse API"}
 
 
 # ROUTE 1.5 — Login (3-Tier RBAC Hackathon Auth)

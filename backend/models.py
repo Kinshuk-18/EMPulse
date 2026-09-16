@@ -51,10 +51,9 @@ class TraineeStatus(str, enum.Enum):
     UNEMPLOYED     = "Unemployed"
 
 
-# ════════════════════════════════════════════════════════════════════════════
 # Model 1: Trainee
 # Maps to the MySQL table  `trainees`
-# ════════════════════════════════════════════════════════════════════════════
+
 class Trainee(Base):
     """
     Represents a vocational/skill-training graduate being tracked
@@ -65,7 +64,7 @@ class Trainee(Base):
 
     __tablename__ = "trainees"   # exact name of the table in MySQL
 
-    # ── Primary Key ──────────────────────────────────────────────────────────
+    # Primary Key ──────────────────────────────────────────────────────────
     id = Column(
         Integer,
         primary_key=True,
@@ -74,7 +73,7 @@ class Trainee(Base):
         comment="Unique internal identifier for the trainee",
     )
 
-    # ── Human-Readable Public Trainee ID ─────────────────────────────────────────
+    # Human-Readable Public Trainee ID ─────────────────────────────────────────
     # Format: EMP-MH-2026-XXXX (state code + cohort year + zero-padded sequence)
     # Nullable so existing rows on the Aiven DB don't break on server restart.
     # The seed script and create_trainee() API generate this after INSERT.
