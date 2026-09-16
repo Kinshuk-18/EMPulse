@@ -134,6 +134,7 @@ export default function Analytics() {
   const { role, scope, district, instituteName } = useContext(AuthContext);
 
   const [trainees, setTrainees] = useState(null);
+  const [longData, setLongData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -166,9 +167,17 @@ export default function Analytics() {
 
       // RBAC-scoped trainee fetch — same filtering logic as Dashboard
       const res = await fetch(`${BASE_URL}/api/trainees?${params.toString()}`);
+      const longRes = await fetch(`${BASE_URL}/api/analytics/longitudinal?${params.toString()}`);
+
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = await res.json();
       setTrainees(data);
+
+      if (longRes.ok) {
+        const lData = await longRes.json();
+        setLongData(lData);
+      }
+
       setLastUpdated(new Date());
     } catch (err) {
       setError('Could not reach backend. Is uvicorn running?');
@@ -379,6 +388,72 @@ export default function Analytics() {
               </div>
             )}
           </SectionCard>
+
+          {/* ── Phase 7: Longitudinal Insights ──────────────────────────────── */}
+          {longData && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+              <SectionCard
+                icon={TrendingUp}
+                title="Wage Progression & Relevance"
+                subtitle="Average wage growth and training relevance score"
+              >
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl">
+                    <div>
+                      <p className="text-xs text-gray-500">Initial Wage</p>
+                      <p className="font-bold text-gray-900">₹{Math.round(longData.wage_progression?.average_initial || 0).toLocaleString()}</p>
+                    </div>
+                    <ArrowUpRight className="text-emerald-500" />
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500">Current Wage</p>
+                      <p className="font-bold text-emerald-600">₹{Math.round(longData.wage_progression?.average_current || 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Wage Growth</span>
+                    <span className="font-bold text-emerald-600">+{longData.wage_progression?.growth_percent?.toFixed(1) || 0}%</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">Training Relevance Score</span>
+                    <span className="font-bold text-indigo-600">{longData.training_relevance?.average_score?.toFixed(1) || 0}%</span>
+                  </div>
+                </div>
+              </SectionCard>
+
+              <SectionCard
+                icon={AlertTriangle}
+                title="Attrition & Skill Gaps"
+                subtitle="Top reasons for drop-out and identified skill gaps"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Top Skill Gaps</h4>
+                    {Object.entries(longData.skill_gaps || {}).map(([gap, count]) => (
+                      <div key={gap} className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-700 truncate pr-2">{gap}</span>
+                        <span className="font-bold text-gray-900">{count}</span>
+                      </div>
+                    ))}
+                    {Object.keys(longData.skill_gaps || {}).length === 0 && (
+                      <p className="text-xs text-gray-400">No skill gap data.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Attrition Reasons</h4>
+                    {Object.entries(longData.attrition_reasons || {}).map(([reason, count]) => (
+                      <div key={reason} className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-700 truncate pr-2">{reason}</span>
+                        <span className="font-bold text-red-600">{count}</span>
+                      </div>
+                    ))}
+                    {Object.keys(longData.attrition_reasons || {}).length === 0 && (
+                      <p className="text-xs text-gray-400">No attrition data.</p>
+                    )}
+                  </div>
+                </div>
+              </SectionCard>
+            </div>
+          )}
 
           {/* ── Section 2: Milestone Retention & Sector Breakdown (side-by-side) ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

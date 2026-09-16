@@ -99,6 +99,18 @@ class TraineeBase(BaseModel):
         examples=["Bhopal"],
     )
 
+    employment_type: Optional[str] = Field(
+        None,
+        description="Type of employment: Salaried, Self-Employed, Apprentice, Unemployed, Drop-out",
+        examples=["Salaried"],
+    )
+    wage_initial: Optional[int] = Field(None, description="Starting monthly wage in INR", examples=[12000])
+    wage_current: Optional[int] = Field(None, description="Current monthly wage in INR", examples=[18500])
+    retention_months: Optional[int] = Field(None, description="Months retained in current job", examples=[12])
+    training_relevance_score: Optional[int] = Field(None, description="Percentage 0-100 indicating training-to-job match", examples=[85])
+    attrition_reason: Optional[str] = Field(None, description="Reason for attrition", examples=["Low Local Wages"])
+    skill_gap_identified: Optional[str] = Field(None, description="Identified skill gaps", examples=["Advanced CNC Programming"])
+
     # ── Field Validators (run automatically before the model is created) ──────
 
     @field_validator("aadhaar_last_four")
@@ -365,3 +377,28 @@ class OutcomeLogResponse(BaseModel):
         description="UTC timestamp of when this outcome log was recorded.",
         examples=["2026-09-14T07:45:00"],
     )
+
+# ════════════════════════════════════════════════════════════════════════════
+# ③ PHASE 7: ANALYTICS & REMEDIAL ACTIONS SCHEMAS
+# ════════════════════════════════════════════════════════════════════════════
+
+class AnalyticsLongitudinalResponse(BaseModel):
+    avg_wage_growth_pct: float
+    avg_wage_growth_inr: float
+    relevance_score_distribution: dict
+    attrition_breakdown: dict
+    skill_gap_breakdown: dict
+    employment_category_distribution: dict
+
+class RemedialActionResponse(BaseModel):
+    id: str
+    triggering_evidence: str
+    recommended_action: str
+    action_type: str
+    target_entity: str
+    impact_estimate: str
+
+class RemedialActionApplyRequest(BaseModel):
+    action_id: str
+    action_type: str
+    target_institute: Optional[str] = None

@@ -14,6 +14,7 @@ import {
   Headphones,
   Network,
   TicketCheck,
+  Activity,
 } from "lucide-react";
 
 // Role-aware nav config — each role sees only what's relevant to their scope.
@@ -24,6 +25,7 @@ function getNavLinks(role) {
       { to: "/dashboard",       label: "Dashboard",           icon: LayoutDashboard, end: true },
       { to: "/trainees",        label: "Trainees",            icon: Users },
       { to: "/analytics",       label: "Analytics",           icon: BarChart3 },
+      { to: "/remedial-actions",label: "Remedial Center",     icon: Activity },
       { to: "/nodal-officers",  label: "Nodal Officers",      icon: Network },
       { to: "/institutes",      label: "Institutes",          icon: Building2 },
       { to: "/support-tickets", label: "Support Tickets",     icon: TicketCheck },
@@ -36,6 +38,7 @@ function getNavLinks(role) {
       { to: "/dashboard", label: "Dashboard",      icon: LayoutDashboard, end: true },
       { to: "/trainees",  label: "Trainees",       icon: Users },
       { to: "/analytics", label: "Analytics",      icon: BarChart3 },
+      { to: "/remedial-actions",label: "Remedial Center",icon: Activity },
       { to: "/contact",   label: "Help & Support", icon: Headphones },
       { to: "/settings",  label: "Settings",       icon: Settings },
     ];

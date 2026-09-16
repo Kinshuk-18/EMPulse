@@ -140,6 +140,49 @@ class Trainee(Base):
         comment="District where the trainee resides (for geographic reporting)",
     )
 
+    # ── Phase 7: Deep Analytics & Outcomes ────────────────────────────────────
+    employment_type = Column(
+        String(50),
+        nullable=True,
+        comment="Type of employment: Salaried, Self-Employed, Apprentice, Unemployed, Drop-out",
+    )
+
+    wage_initial = Column(
+        Integer,
+        nullable=True,
+        comment="Starting monthly wage in INR",
+    )
+
+    wage_current = Column(
+        Integer,
+        nullable=True,
+        comment="Current monthly wage in INR post-progression",
+    )
+
+    retention_months = Column(
+        Integer,
+        nullable=True,
+        comment="Months retained in current job (e.g. 3, 6, 12, 18)",
+    )
+
+    training_relevance_score = Column(
+        Integer,
+        nullable=True,
+        comment="Percentage 0-100 indicating training-to-job match",
+    )
+
+    attrition_reason = Column(
+        String(200),
+        nullable=True,
+        comment="Reason for attrition e.g., Low Local Wages, Relocation Constraints",
+    )
+
+    skill_gap_identified = Column(
+        String(200),
+        nullable=True,
+        comment="Identified skill gaps e.g., Advanced CNC Programming, English Communication",
+    )
+
     # ── Relationship ──────────────────────────────────────────────────────────
     # 'outcome_logs' is a VIRTUAL attribute (not a real DB column).
     # When you access  trainee.outcome_logs  SQLAlchemy will automatically

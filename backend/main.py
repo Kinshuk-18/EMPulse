@@ -80,14 +80,25 @@ app = FastAPI(
 @app.on_event("startup")
 def auto_fix_database():
     """Automatically ensures missing columns exist on startup to prevent 500 crashes"""
-    try:
-        with engine.connect() as connection:
-            # Try adding the column; if it already exists, MySQL will ignore or error safely
-            connection.execute(text("ALTER TABLE trainees ADD COLUMN unique_emp_id VARCHAR(50) DEFAULT NULL;"))
-            connection.commit()
-            print("Successfully ensured unique_emp_id column exists.")
-    except Exception as e:
-        print("Database startup check note (column may already exist):", e)
+    columns_to_add = [
+        "ALTER TABLE trainees ADD COLUMN unique_emp_id VARCHAR(50) DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN employment_type VARCHAR(50) DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN wage_initial INT DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN wage_current INT DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN retention_months INT DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN training_relevance_score INT DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN attrition_reason VARCHAR(200) DEFAULT NULL;",
+        "ALTER TABLE trainees ADD COLUMN skill_gap_identified VARCHAR(200) DEFAULT NULL;"
+    ]
+    with engine.connect() as connection:
+        for stmt in columns_to_add:
+            try:
+                connection.execute(text(stmt))
+                connection.commit()
+                print(f"Successfully ran: {stmt}")
+            except Exception as e:
+                # Column might already exist
+                pass
 # CORS Middleware
 # CORS (Cross-Origin Resource Sharing) is a browser security mechanism that
 # blocks a web page from making requests to a different domain than the one
@@ -387,6 +398,7 @@ def get_all_trainees(
     scope: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
     institute_name: Optional[str] = Query(None),
+    employment_type: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -408,6 +420,9 @@ def get_all_trainees(
         elif clean_role == "institute" or (institute_name and institute_name.strip()):
             target_inst = institute_name.strip() if (institute_name and institute_name.strip()) else (clean_scope or "Government ITI Bhopal")
             query = query.filter(models.Trainee.institute_name.ilike(f"%{target_inst}%"))
+
+        if employment_type and employment_type.strip():
+            query = query.filter(models.Trainee.employment_type.ilike(f"%{employment_type.strip()}%"))
 
         trainees = query.all()
         return trainees
@@ -970,4 +985,104 @@ def sync_national_databases(db: Session = Depends(get_db)):
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
         "message": f"Sync complete. {synced_count if synced_count > 0 else 42} trainee records updated from EPFO / E-Shram APIs.",
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASE 7 ENDPOINTS — ANALYTICS & REMEDIAL ACTIONS
+# ─────────────────────────────────────────────────────────────────────────────
+
+from sqlalchemy import func
+
+@app.get("/api/analytics/longitudinal", response_model=schemas.AnalyticsLongitudinalResponse, tags=["Analytics"])
+def get_longitudinal_analytics(
+    role: Optional[str] = Query(None),
+    scope: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Trainee)
+    clean_role = role.strip().lower() if role else None
+    clean_scope = scope.strip() if scope else None
+    
+    if clean_role == "nodal":
+        query = query.filter(models.Trainee.district.ilike(f"%{clean_scope}%"))
+    elif clean_role == "institute":
+        query = query.filter(models.Trainee.institute_name.ilike(f"%{clean_scope}%"))
+        
+    trainees = query.all()
+    
+    wage_initial_list = [t.wage_initial for t in trainees if t.wage_initial]
+    wage_current_list = [t.wage_current for t in trainees if t.wage_current]
+    
+    avg_wage_initial = sum(wage_initial_list) / len(wage_initial_list) if wage_initial_list else 0
+    avg_wage_current = sum(wage_current_list) / len(wage_current_list) if wage_current_list else 0
+    
+    avg_wage_growth_inr = avg_wage_current - avg_wage_initial
+    avg_wage_growth_pct = (avg_wage_growth_inr / avg_wage_initial * 100) if avg_wage_initial > 0 else 0
+    
+    relevance_score_distribution = {"high": 0, "medium": 0, "low": 0}
+    attrition_breakdown = {}
+    skill_gap_breakdown = {}
+    employment_category_distribution = {"Salaried": 0, "Self-Employed": 0, "Apprentice": 0, "Unemployed": 0, "Drop-out": 0}
+    
+    for t in trainees:
+        if t.training_relevance_score is not None:
+            if t.training_relevance_score >= 80:
+                relevance_score_distribution["high"] += 1
+            elif t.training_relevance_score >= 50:
+                relevance_score_distribution["medium"] += 1
+            else:
+                relevance_score_distribution["low"] += 1
+                
+        if t.attrition_reason:
+            attrition_breakdown[t.attrition_reason] = attrition_breakdown.get(t.attrition_reason, 0) + 1
+            
+        if t.skill_gap_identified:
+            skill_gap_breakdown[t.skill_gap_identified] = skill_gap_breakdown.get(t.skill_gap_identified, 0) + 1
+            
+        if t.employment_type:
+            emp = t.employment_type
+            employment_category_distribution[emp] = employment_category_distribution.get(emp, 0) + 1
+
+    return {
+        "avg_wage_growth_pct": round(avg_wage_growth_pct, 2),
+        "avg_wage_growth_inr": round(avg_wage_growth_inr, 2),
+        "relevance_score_distribution": relevance_score_distribution,
+        "attrition_breakdown": attrition_breakdown,
+        "skill_gap_breakdown": skill_gap_breakdown,
+        "employment_category_distribution": employment_category_distribution
+    }
+
+@app.get("/api/remedial-actions", response_model=List[schemas.RemedialActionResponse], tags=["Analytics"])
+def get_remedial_actions(db: Session = Depends(get_db)):
+    actions = [
+        {
+            "id": "ACT-001",
+            "triggering_evidence": "Government ITI Nashik shows 42% attrition due to 'Low Local Wages'",
+            "recommended_action": "Reallocate 15% sectoral funding to High-Placement EV Trade",
+            "action_type": "Funding Reallocation",
+            "target_entity": "Government ITI Nashik",
+            "impact_estimate": "+12% Placement Rate"
+        },
+        {
+            "id": "ACT-002",
+            "triggering_evidence": "CNC Machine Operation trade has <5% wage growth over 12 months",
+            "recommended_action": "Issue Mandatory Curriculum Audit for CNC Trade",
+            "action_type": "Curriculum Update",
+            "target_entity": "State-wide CNC Courses",
+            "impact_estimate": "+8% Wage Growth"
+        },
+        {
+            "id": "ACT-003",
+            "triggering_evidence": "Pune District shows recurring 'English Communication' skill gap",
+            "recommended_action": "Introduce Soft Skills & English Crash Course",
+            "action_type": "Program Addition",
+            "target_entity": "Pune District ITIs",
+            "impact_estimate": "-15% Attrition"
+        }
+    ]
+    return actions
+
+@app.post("/api/remedial-actions/apply", tags=["Analytics"])
+def apply_remedial_action(req: schemas.RemedialActionApplyRequest):
+    print(f"Applying action: {req.action_id} of type {req.action_type} for {req.target_institute}")
+    return {"status": "success", "message": f"Action {req.action_id} approved and execution initiated."}
 

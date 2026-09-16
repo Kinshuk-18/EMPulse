@@ -429,6 +429,7 @@ export default function Dashboard() {
   const { role, scope, district, instituteName } = useContext(AuthContext);
 
   const [trainees, setTrainees] = useState(null);
+  const [longData, setLongData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -446,10 +447,17 @@ export default function Dashboard() {
 
       // RBAC-scoped fetch — backend filters by role/district/institute automatically
       const res = await fetch(`${BASE_URL}/api/trainees?${params.toString()}`);
+      const longRes = await fetch(`${BASE_URL}/api/analytics/longitudinal?${params.toString()}`);
 
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       const data = await res.json();
       setTrainees(data);
+
+      if (longRes.ok) {
+        const lData = await longRes.json();
+        setLongData(lData);
+      }
+
       setLastUpdated(new Date());
     } catch (err) {
       setError(
@@ -529,6 +537,17 @@ export default function Dashboard() {
       iconBg: "#FFF7ED",
       iconColor: "#F97316",
     },
+    {
+      id: "wage-growth",
+      label: "Avg Wage Growth",
+      value: loading ? "—" : `+${longData?.wage_progression?.growth_percent?.toFixed(1) || 0}%`,
+      change: "Phase 7",
+      trend: "up",
+      description: "Post-training salary bump",
+      icon: Activity,
+      iconBg: "#EEF2FF",
+      iconColor: "#6c5ce7",
+    },
   ];
 
   const formattedTime = lastUpdated
@@ -594,7 +613,7 @@ export default function Dashboard() {
         {loading ? (
           <Spinner />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
             {metrics.map((metric) => (
               <MetricCard key={metric.id} metric={metric} />
             ))}

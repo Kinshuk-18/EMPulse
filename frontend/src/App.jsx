@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Trainees from './pages/Trainees';
 import Analytics from './pages/Analytics';
+import RemedialActions from './pages/RemedialActions';
 import Contact from './pages/Contact';
 
 // Admin-only sidebar pages
@@ -154,6 +155,17 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Analytics />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/remedial-actions"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <RemedialActions />
             </Layout>
           </ProtectedRoute>
         }
