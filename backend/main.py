@@ -145,30 +145,46 @@ app.add_middleware(
 _nodal_officers_store: list[dict] = [
     {
         "id": 1,
-        "name": "Priya Mehta",
-        "email": "nodal_officer1@empulse",
-        "district": "Bhopal",
-        "phone": "9425001234",
+        "name": "Rajesh Patil",
+        "email": "pune.nodal@empulse.gov.in",
+        "district": "Pune",
+        "phone": "9822012345",
         "status": "Active",
     },
     {
         "id": 2,
-        "name": "Ramesh Gupta",
-        "email": "nodal_officer2@empulse",
-        "district": "Indore",
-        "phone": "9826005678",
+        "name": "Sunita Deshmukh",
+        "email": "mumbai.nodal@empulse.gov.in",
+        "district": "Mumbai Suburban",
+        "phone": "9820056789",
         "status": "Active",
     },
     {
         "id": 3,
-        "name": "Sunita Yadav",
-        "email": "nodal_officer3@empulse",
-        "district": "Gwalior",
-        "phone": "9111009999",
+        "name": "Amit Shinde",
+        "email": "nagpur.nodal@empulse.gov.in",
+        "district": "Nagpur",
+        "phone": "9422109876",
+        "status": "Active",
+    },
+    {
+        "id": 4,
+        "name": "Sanjay Pawar",
+        "email": "nashik.nodal@empulse.gov.in",
+        "district": "Nashik",
+        "phone": "9823344556",
+        "status": "Active",
+    },
+    {
+        "id": 5,
+        "name": "Anjali Kulkarni",
+        "email": "cs.nodal@empulse.gov.in",
+        "district": "Chhatrapati Sambhajinagar",
+        "phone": "9921122334",
         "status": "Active",
     },
 ]
-_nodal_officer_id_counter = 4
+_nodal_officer_id_counter = 6
 
 # In-memory Institute store — same pattern as nodal officers.
 # Seeded with realistic Madhya Pradesh ITI data for demo purposes.
